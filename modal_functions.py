@@ -17,10 +17,10 @@ def create_image():
         .pip_install(["requests"])
     )
 
-# Create the stub with the image
-stub = modal.Stub("just-call-bud-prod", image=create_image())
+# Create the app with the image
+app = modal.App("just-call-bud-prod", image=create_image())
 
-@stub.function(
+@app.function(
     gpu="T4",
     secrets=[modal.Secret.from_name("just-call-bud-secrets")]
 )
@@ -54,11 +54,11 @@ def get_llama_response(prompt: str):
 
 # For testing
 if __name__ == "__main__":
-    with stub.run():
+    with app.run():
         response = get_llama_response.remote("Hi, how are you?")
         print(f"Test response: {response}")
 
 # The test function can still be used by other parts of the app
-@stub.function()
+@app.function()
 def test():
     return "Modal connection successful!"  # Simple response to verify connection 
