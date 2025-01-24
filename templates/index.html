@@ -20,8 +20,8 @@
         <div class="flex flex-col lg:flex-row gap-8">
             <!-- Main Chat Column -->
             <main class="flex-1 flex flex-col pr-4">
-                <!-- Welcome Section -->
-                <div id="messages" class="mb-2">
+                <!-- Messages container -->
+                <div id="messages" class="pb-32">
                     <div class="flex items-start gap-6 py-4 text-gray-500">
                         <img src="{{ url_for('static', filename='bud-logo.jpg') }}" alt="Bud Logo" class="w-20 h-20 rounded-full object-cover flex-shrink-0">
                         <div class="pt-2">
@@ -29,44 +29,86 @@
                             <p class="text-sm mb-2">Ask me anything about home maintenance and repairs.</p>
                         </div>
                     </div>
+
+                    <!-- Typing Indicator -->
+                    <div id="typing-indicator" class="hidden">
+                        <div class="flex justify-start mb-4">
+                            <div class="max-w-[85%] bg-white rounded-lg px-6 py-4 shadow-sm border border-gray-100">
+                                <div class="flex items-center gap-2">
+                                    <img src="{{ url_for('static', filename='bud-logo.jpg') }}" alt="Bud Logo" class="w-8 h-8 rounded-full">
+                                    <div class="flex gap-1">
+                                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Input Form Area -->
-                <div class="sticky bottom-4 mt-auto">
-                    <!-- Clear Chat Button -->
-                    <div class="flex justify-end mb-2">
-                        <button
-                            id="clear-chat"
-                            type="button"
-                            class="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1 bg-gray-100 px-2 py-1 rounded"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                            Clear Chat
-                        </button>
-                    </div>
+                <div class="fixed bottom-0 left-0 right-0 lg:right-80 bg-gray-50 border-t">
+                    <div class="max-w-6xl mx-auto px-4 py-4">
+                        <!-- Input Form -->
+                        <form id="chat-form" class="flex flex-col gap-2">
+                            <!-- Image Preview -->
+                            <div id="image-preview" class="hidden">
+                                <div class="relative inline-block">
+                                    <img id="preview-img" class="max-h-32 rounded-lg">
+                                    <button type="button" id="remove-image" class="absolute top-1 right-1 bg-gray-800 bg-opacity-50 text-white rounded-full p-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Input Area -->
+                            <div class="flex gap-2">
+                                <textarea
+                                    id="message-input"
+                                    rows="1"
+                                    placeholder="Type your question here..."
+                                    class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pl-4 py-2 resize-none overflow-hidden"
+                                ></textarea>
+                                <label class="cursor-pointer bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                        <polyline points="21 15 16 10 5 21"></polyline>
+                                    </svg>
+                                    <input type="file" id="image-upload" class="hidden" accept="image/*">
+                                </label>
+                                <button
+                                    type="submit"
+                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M7 13l-2 2 2 2"></path>
+                                        <path d="M17 17H7"></path>
+                                        <path d="M7 3h10l4 4-4 4H7l4-4-4-4z"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </form>
 
-                    <!-- Input Form -->
-                    <form id="chat-form" class="flex gap-2">
-                        <input
-                            type="text"
-                            id="message-input"
-                            placeholder="Type your question here..."
-                            class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pl-4"
-                        >
-                        <button
-                            type="submit"
-                            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M7 13l-2 2 2 2"></path>
-                                <path d="M17 17H7"></path>
-                                <path d="M7 3h10l4 4-4 4H7l4-4-4-4z"></path>
-                            </svg>
-                        </button>
-                    </form>
+                        <!-- Clear Chat Button -->
+                        <div class="flex justify-end mt-2">
+                            <button
+                                id="clear-chat"
+                                type="button"
+                                class="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                                Clear Chat
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </main>
 
@@ -84,19 +126,66 @@
         const input = document.getElementById('message-input');
         const messagesContainer = document.getElementById('messages');
 
+        let currentImage = null;
+        const imageUpload = document.getElementById('image-upload');
+        const imagePreview = document.getElementById('image-preview');
+        const previewImg = document.getElementById('preview-img');
+        const removeImageBtn = document.getElementById('remove-image');
+
         async function loadMessages() {
             const response = await fetch('/api/messages');
             const messages = await response.json();
-            messages.forEach(message => addMessageToUI(message));
+            if (messages.length === 0) {
+                // Only show welcome message if no messages exist
+                messagesContainer.innerHTML = `
+                    <div class="flex items-start gap-6 py-4 text-gray-500">
+                        <img src="{{ url_for('static', filename='bud-logo.jpg') }}" alt="Bud Logo" class="w-20 h-20 rounded-full object-cover flex-shrink-0">
+                        <div class="pt-2">
+                            <p class="text-lg font-medium">Hi, I'm Bud. Your AI Handyman. Ask me anything. 👋</p>
+                            <p class="text-sm mb-2">Ask me anything about home maintenance and repairs.</p>
+                        </div>
+                    </div>
+
+                    <!-- Typing Indicator -->
+                    <div id="typing-indicator" class="hidden">
+                        <div class="flex justify-start mb-4">
+                            <div class="max-w-[85%] bg-white rounded-lg px-6 py-4 shadow-sm border border-gray-100">
+                                <div class="flex items-center gap-2">
+                                    <img src="{{ url_for('static', filename='bud-logo.jpg') }}" alt="Bud Logo" class="w-8 h-8 rounded-full">
+                                    <div class="flex gap-1">
+                                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                messages.forEach(message => addMessageToUI(message));
+            }
         }
 
         function addMessageToUI(message) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `flex ${message.isUser ? 'justify-end' : 'justify-start'} mb-4`;
             
+            // Split into paragraphs and handle numbered lists
             const formattedContent = message.content
                 .split(/\n\n+/)
-                .map(para => `<p class="mb-2 last:mb-0">${para.trim()}</p>`)
+                .map(para => {
+                    // Check if paragraph contains numbered list
+                    if (para.match(/^\d+\./m)) {
+                        // Split into list items and format as an ordered list
+                        const listItems = para.split(/\n/)
+                            .filter(line => line.trim())
+                            .map(line => `<li class="ml-4">${line.replace(/^\d+\.\s*/, '')}</li>`)
+                            .join('');
+                        return `<ol class="list-decimal list-outside mb-4 space-y-2">${listItems}</ol>`;
+                    }
+                    return `<p class="mb-4 last:mb-0">${para.trim()}</p>`;
+                })
                 .join('');
             
             messageDiv.innerHTML = `
@@ -112,43 +201,146 @@
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
 
-        form.addEventListener('submit', async (e) => {
+        // Add image upload handler
+        imageUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                currentImage = file;
+                previewImg.src = URL.createObjectURL(file);
+                imagePreview.classList.remove('hidden');
+            }
+        });
+
+        // Remove image handler
+        removeImageBtn.addEventListener('click', function() {
+            currentImage = null;
+            imagePreview.classList.add('hidden');
+            imageUpload.value = '';
+        });
+
+        // Add this function to handle message submission
+        async function handleSubmit(e) {
+            console.log('Form submitted!');
             e.preventDefault();
             const content = input.value.trim();
-            if (!content) return;
+            console.log('Content:', content);
+            if (!content && !currentImage) return;
 
-            input.disabled = true;
-            form.querySelector('button').disabled = true;
-
+            // Clear input immediately after getting content
+            input.value = '';
+            input.style.height = 'auto'; // Reset height for textarea
+            
             try {
+                // Add user message immediately
+                addMessageToUI({ content, isUser: true });
+                if (currentImage) {
+                    addImageToUI(URL.createObjectURL(currentImage), true);
+                    currentImage = null;
+                    imagePreview.classList.add('hidden');
+                }
+
+                // Show typing indicator
+                const typingIndicator = document.createElement('div');
+                typingIndicator.className = 'flex justify-start mb-4';
+                typingIndicator.innerHTML = `
+                    <div class="max-w-[85%] bg-white rounded-lg px-6 py-4 shadow-sm border border-gray-100">
+                        <div class="flex items-center gap-2">
+                            <img src="{{ url_for('static', filename='bud-logo.jpg') }}" alt="Bud Logo" class="w-8 h-8 rounded-full">
+                            <div class="flex gap-1">
+                                <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                                <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                messagesContainer.appendChild(typingIndicator);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+                input.disabled = true;
+                form.querySelector('button').disabled = true;
+
+                console.log('Creating FormData...');
+                const formData = new FormData();
+                formData.append('content', content);
+                if (currentImage) {
+                    formData.append('image', currentImage);
+                }
+
+                console.log('Sending request to /api/chat...');
                 const response = await fetch('/api/chat', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content })
+                    body: formData
                 });
 
+                console.log('Response status:', response.status);
+
                 if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                    const errorText = await response.text();
+                    console.error('Server error:', errorText);
+                    throw new Error(`Network response was not ok: ${errorText}`);
                 }
 
                 const botMessage = await response.json();
-                
-                addMessageToUI({ content, isUser: true });
-                input.value = '';
+                console.log('Bot response:', botMessage);
+
+                // Remove typing indicator
+                typingIndicator.remove();
+
+                // Add bot response
                 addMessageToUI(botMessage);
 
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Full error details:', error);
+                console.error('Error stack:', error.stack);
+                
+                // Remove any existing typing indicator
+                const existingIndicator = messagesContainer.querySelector('.typing-indicator');
+                if (existingIndicator) {
+                    existingIndicator.remove();
+                }
+
                 addMessageToUI({
                     content: "Sorry, there was an error. Please try again.",
                     isUser: false
                 });
             } finally {
+                currentImage = null;
+                imagePreview.classList.add('hidden');
                 input.disabled = false;
                 form.querySelector('button').disabled = false;
                 input.focus();
             }
+        }
+
+        // Add event listeners for both form submit and Enter key
+        form.addEventListener('submit', handleSubmit);
+
+        // Handle Enter key (but Shift+Enter for new line)
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                form.dispatchEvent(new Event('submit'));
+            }
         });
+
+        // Add function to display images in chat
+        function addImageToUI(src, isUser) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`;
+            
+            messageDiv.innerHTML = `
+                <div class="max-w-[85%] rounded-lg overflow-hidden ${
+                    isUser
+                        ? 'bg-blue-600'
+                        : 'bg-white border border-gray-100'
+                } shadow-sm">
+                    <img src="${src}" class="max-h-64 object-contain">
+                </div>
+            `;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
 
         // Add clear chat functionality
         const clearChatButton = document.getElementById('clear-chat');
@@ -160,13 +352,29 @@
                     method: 'DELETE'
                 });
                 
-                // Clear messages from UI
+                // Clear messages from UI and restore welcome message with typing indicator
                 messagesContainer.innerHTML = `
                     <div class="flex items-start gap-6 py-4 text-gray-500">
                         <img src="{{ url_for('static', filename='bud-logo.jpg') }}" alt="Bud Logo" class="w-20 h-20 rounded-full object-cover flex-shrink-0">
                         <div class="pt-2">
                             <p class="text-lg font-medium">Hi, I'm Bud. Your AI Handyman. Ask me anything. 👋</p>
                             <p class="text-sm mb-2">Ask me anything about home maintenance and repairs.</p>
+                        </div>
+                    </div>
+
+                    <!-- Typing Indicator -->
+                    <div id="typing-indicator" class="hidden">
+                        <div class="flex justify-start mb-4">
+                            <div class="max-w-[85%] bg-white rounded-lg px-6 py-4 shadow-sm border border-gray-100">
+                                <div class="flex items-center gap-2">
+                                    <img src="{{ url_for('static', filename='bud-logo.jpg') }}" alt="Bud Logo" class="w-8 h-8 rounded-full">
+                                    <div class="flex gap-1">
+                                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -178,6 +386,56 @@
         clearChatButton.addEventListener('click', clearChat);
 
         loadMessages();
+
+        // Auto-resize textarea
+        const textarea = document.getElementById('message-input');
+        textarea.addEventListener('input', function() {
+            // Reset height to auto to get the right scrollHeight
+            this.style.height = 'auto';
+            // Set new height based on content
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // Function to update bottom margin based on message count
+        function updateMessagesMargin() {
+            const messageCount = messagesContainer.querySelectorAll('.flex').length;
+            // If there's more than just the welcome message, add more bottom margin
+            if (messageCount > 1) {
+                messagesContainer.classList.remove('mb-2');
+                messagesContainer.classList.add('mb-24');
+            } else {
+                messagesContainer.classList.remove('mb-24');
+                messagesContainer.classList.add('mb-2');
+            }
+        }
+
+        // Update the addMessageToUI function to call updateMessagesMargin
+        const originalAddMessageToUI = addMessageToUI;
+        addMessageToUI = function(message) {
+            originalAddMessageToUI(message);
+            updateMessagesMargin();
+        }
+
+        // Update the clearChat function to reset margin
+        const originalClearChat = clearChat;
+        clearChat = async function() {
+            await originalClearChat();
+            updateMessagesMargin();
+        }
+
+        // Call it on initial load
+        updateMessagesMargin();
+
+        // Add this temporary test code at the bottom of your script
+        async function testEndpoint() {
+            const response = await fetch('/test', {
+                method: 'POST',
+                body: new FormData()
+            });
+            console.log('Test response:', await response.json());
+        }
+        // Call it
+        testEndpoint();
     </script>
 </body>
 </html>
