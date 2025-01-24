@@ -6,6 +6,7 @@ import modal
 import time
 import subprocess
 import os
+from modal import Secret, Stub
 
 # Define the image
 def create_image():
@@ -21,9 +22,11 @@ def create_image():
 # Create the app with the image
 app = modal.App("just-call-bud-prod", image=create_image())
 
-@app.function(
+stub = Stub("just-call-bud-prod")
+
+@stub.function(
     gpu="T4",
-    secrets=[modal.Secret.from_name("just-call-bud-secrets")]
+    secrets=[Secret.from_name("just-call-bud-secrets")]
 )
 def get_llama_response(prompt: str):
     import requests
