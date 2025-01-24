@@ -24,7 +24,7 @@ app = modal.App("just-call-bud-prod", image=create_image())
 
 @app.function(
     gpu="T4",
-    secrets=[Secret.from_name("just-call-bud-secrets")]
+    secrets=[modal.Secret.from_name("just-call-bud-secrets")]
 )
 def get_llama_response(prompt: str):
     import requests

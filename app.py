@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Get the deployed Modal app
-modal_app = App("just-call-bud-prod")
+# Get the deployed Modal app - make sure name matches exactly
+modal_app = App("just-call-bud-prod")  # This must match the name in Modal dashboard
 
 messages = []  # Store messages in memory
 
@@ -94,6 +94,34 @@ def test():
     except Exception as e:
         logger.error(f"Test endpoint error: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/modal-test')
+async def modal_test():
+    try:
+        logger.info("Testing Modal connection...")
+        
+        # Try to call the test function from modal_functions.py
+        try:
+            response = await modal_app.test.remote()
+            logger.info(f"Modal test response: {response}")
+            
+            return jsonify({
+                'status': 'success',
+                'modal_response': response,
+                'timestamp': datetime.now().isoformat()
+            })
+            
+        except Exception as modal_error:
+            logger.error(f"Modal test error: {str(modal_error)}", exc_info=True)
+            raise
+            
+    except Exception as e:
+        logger.error(f"Modal test endpoint error: {str(e)}", exc_info=True)
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 port = int(os.environ.get('PORT', 5001))
 
