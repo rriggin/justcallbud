@@ -6,7 +6,6 @@ import modal
 import time
 import subprocess
 import os
-from modal import Secret, Image
 
 # Define the image
 def create_image():
@@ -24,7 +23,7 @@ app = modal.App("just-call-bud-prod", image=create_image())
     gpu="T4",
     secrets=[modal.Secret.from_name("just-call-bud-secrets")]
 )
-def get_llama_response(prompt: str):
+async def get_llama_response(prompt: str):
     import requests
     
     # Start Ollama and wait for it
@@ -60,5 +59,5 @@ if __name__ == "__main__":
 
 # The test function can still be used by other parts of the app
 @app.function()
-def test():
+async def test():
     return "Modal connection successful!"  # Simple response to verify connection 
