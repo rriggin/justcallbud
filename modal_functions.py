@@ -6,7 +6,7 @@ import modal
 import time
 import subprocess
 import os
-from modal import Secret, Stub
+from modal import Secret, Image
 
 # Define the image
 def create_image():
@@ -22,18 +22,12 @@ def create_image():
 # Create the app with the image
 app = modal.App("just-call-bud-prod", image=create_image())
 
-stub = Stub("just-call-bud-prod")
-
-@stub.function(
+@app.function(
     gpu="T4",
     secrets=[Secret.from_name("just-call-bud-secrets")]
 )
 def get_llama_response(prompt: str):
     import requests
-    
-    # Access the secrets we actually have
-    flask_env = os.environ["FLASK_ENV"]
-    port = os.environ["PORT"]
     
     # Start Ollama and wait for it
     subprocess.Popen(['ollama', 'serve'])
@@ -60,11 +54,11 @@ def get_llama_response(prompt: str):
     
     return response.json()['response']
 
-@app.local_entrypoint()
-def main():
-    # No need for app.run() context when using local_entrypoint
-    result = get_llama_response.remote("Hi, how are you?")
-    print(f"Test response: {result}")
+# For testing
+if __name__ == "__main__":
+    with app.run():
+        response = get_llama_response.remote("Hi, how are you?")
+        print(f"Test response: {response}")
 
 # The test function can still be used by other parts of the app
 @app.function()
