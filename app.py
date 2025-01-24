@@ -1,3 +1,6 @@
+from gevent import monkey
+monkey.patch_all()
+
 from flask import Flask, render_template, request, jsonify, url_for
 from datetime import datetime
 import os
@@ -9,14 +12,20 @@ from werkzeug.utils import secure_filename
 import logging
 from modal import App
 
+# Set up logging first
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
-# Add these near the top after load_dotenv()
+# Now we can use logger
 MODAL_TOKEN_ID = os.getenv('MODAL_TOKEN_ID')
 MODAL_TOKEN_SECRET = os.getenv('MODAL_TOKEN_SECRET')
 
 if not MODAL_TOKEN_ID or not MODAL_TOKEN_SECRET:
-    logger.warning("Modal tokens not found in environment variables")
+    logger.warning("Modal tokens not found in environment variables. Some features may not work.")
+else:
+    logger.info("Modal tokens found in environment")
 
 app = Flask(__name__)
 
@@ -25,11 +34,13 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Set up logging at the top of app.py
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
 def ensure_ollama_running():
+    # Skip Ollama check in production
+    if os.getenv('FLASK_ENV') == 'production':
+        logger.info("Skipping Ollama check in production (using Modal)")
+        return True
+        
+    # Original Ollama check code for local development
     try:
         logger.info("Checking if Ollama is running...")
         response = requests.get('http://localhost:11434/api/tags')
