@@ -7,8 +7,16 @@ import time
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 import logging
+from modal import App
 
 load_dotenv()
+
+# Add these near the top after load_dotenv()
+MODAL_TOKEN_ID = os.getenv('MODAL_TOKEN_ID')
+MODAL_TOKEN_SECRET = os.getenv('MODAL_TOKEN_SECRET')
+
+if not MODAL_TOKEN_ID or not MODAL_TOKEN_SECRET:
+    logger.warning("Modal tokens not found in environment variables")
 
 app = Flask(__name__)
 
@@ -62,6 +70,9 @@ ensure_ollama_running()
 
 # Initialize empty messages array on server start
 messages = []
+
+# Get the deployed app
+modal_app = App("just-call-bud-prod")
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -126,7 +137,7 @@ def get_llama_response(prompt):
         raise
 
 @app.route('/api/chat', methods=['POST'])
-def chat():
+async def chat():
     try:
         logger.info("\n" + "="*50)
         logger.info("🔄 Chat endpoint called")
@@ -166,14 +177,13 @@ def chat():
         messages.append(user_msg)
         logger.info("Stored user message")
 
-        # Get AI response
-        logger.info("Getting AI response...")
-        ai_response = get_llama_response(prompt)
+        # Call the deployed Modal function
+        response = await modal_app.get_llama_response.remote(prompt)
         logger.info("Successfully got AI response")
 
         # Create response
         ai_msg = {
-            'content': ai_response,
+            'content': response,
             'isUser': False,
             'timestamp': datetime.now().isoformat()
         }
@@ -206,7 +216,31 @@ def test():
     logger.info(f"Form data: {dict(request.form)}")
     return jsonify({"status": "ok"})
 
+@app.route('/health')
+def health():
+    try:
+        logger.debug("Health check called")
+        # Test Modal connection
+        with modal_app.run():
+            response = modal_app.test.remote()
+        logger.debug(f"Modal response: {response}")
+        return jsonify({
+            'status': 'healthy',
+            'modal': 'connected',
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}", exc_info=True)
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+# Add port from environment for Render
+port = int(os.environ.get('PORT', 5001))
+
 if __name__ == '__main__':
     if not os.getenv('OPENAI_API_KEY'):
         print("Warning: OPENAI_API_KEY not found in environment variables")
-    app.run(debug=True, port=5001)
+    app.run(host='0.0.0.0', port=port)

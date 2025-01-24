@@ -157,3 +157,11 @@ INFO:__main__:Test endpoint called!
 INFO:__main__:Form data: {}
 INFO:werkzeug:127.0.0.1 - - [24/Jan/2025 13:26:04] "POST /test HTTP/1.1" 200 -
 INFO:werkzeug:127.0.0.1 - - [24/Jan/2025 13:26:04] "GET /api/messages HTTP/1.1" 200 -
+INFO:werkzeug: * Detected change in '/Users/ryanriggin/Code/bud/modal_functions.py', reloading
+INFO:werkzeug: * Restarting with stat
+/Users/ryanriggin/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+Traceback (most recent call last):
+  File "/Users/ryanriggin/Code/bud/app.py", line 10, in <module>
+    from modal import stub
+ModuleNotFoundError: No module named 'modal'
