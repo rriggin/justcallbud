@@ -27,7 +27,7 @@ async def chat():
     try:
         logger.info("=== New Chat Request ===")
         user_message = request.form.get('content', '')
-        logger.info(f"User message: {user_message[:100]}...")  # Log first 100 chars
+        logger.info(f"User message: {user_message[:100]}...")
 
         if not user_message:
             logger.error("Empty message received")
@@ -41,8 +41,9 @@ async def chat():
         
         logger.info("Calling Modal function...")
         try:
+            # Make sure this matches the function name in modal_functions.py
             response = await modal_app.get_llama_response.remote(prompt)
-            logger.info(f"Modal response received: {response[:100]}...")  # Log first 100 chars
+            logger.info(f"Modal response received: {response[:100]}...")
         except Exception as modal_error:
             logger.error(f"Modal error: {str(modal_error)}", exc_info=True)
             raise
