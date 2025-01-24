@@ -13,16 +13,14 @@ def create_image():
     return (
         modal.Image.debian_slim()
         .apt_install("curl")
-        .run_commands(
-            "curl -fsSL https://ollama.com/install.sh | sh",
-        )
+        .run_commands("curl -fsSL https://ollama.com/install.sh | sh")
         .pip_install(["requests"])
     )
 
-# Create the app with the image
-app = modal.App("just-call-bud-prod", image=create_image())
+# Create the stub with the image
+stub = modal.Stub("just-call-bud-prod", image=create_image())
 
-@app.function(
+@stub.function(
     gpu="T4",
     secrets=[modal.Secret.from_name("just-call-bud-secrets")]
 )
@@ -56,11 +54,11 @@ def get_llama_response(prompt: str):
 
 # For testing
 if __name__ == "__main__":
-    with app.run():
+    with stub.run():
         response = get_llama_response.remote("Hi, how are you?")
         print(f"Test response: {response}")
 
 # The test function can still be used by other parts of the app
-@app.function()
+@stub.function()
 def test():
     return "Modal connection successful!"  # Simple response to verify connection 

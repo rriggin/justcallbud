@@ -5,7 +5,7 @@ from flask import Flask, render_template, request, jsonify
 from datetime import datetime
 import os
 import logging
-from modal import App
+from modal import Stub
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Get the deployed Modal app - make sure name matches exactly
-modal_app = App("just-call-bud-prod")  # This must match the name in Modal dashboard
+# Get the deployed Modal stub
+modal_app = Stub("just-call-bud-prod")
 
 messages = []  # Store messages in memory
 
