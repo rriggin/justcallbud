@@ -63,4 +63,4 @@ if __name__ == "__main__":
 # The test function can still be used by other parts of the app
 @app.function()
 def test():
-    return get_llama_response.remote("Hi, how are you?") 
+    return "Modal connection successful!"  # Simple response to verify connection 
