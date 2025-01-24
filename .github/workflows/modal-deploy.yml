@@ -26,10 +26,6 @@ jobs:
             echo "Error: Invalid Modal token ID format"
             exit 1
           fi
-          if [[ ! "$MODAL_TOKEN_SECRET" =~ ^mo-[a-zA-Z0-9]+$ ]]; then
-            echo "Error: Invalid Modal token secret format"
-            exit 1
-          fi
           echo "Token formats look valid"
         env:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
