@@ -10,7 +10,7 @@ import time
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
 import logging
-from modal import App
+from modal import App, Secret
 
 # Set up logging first
 logging.basicConfig(level=logging.DEBUG)
@@ -82,8 +82,9 @@ ensure_ollama_running()
 # Initialize empty messages array on server start
 messages = []
 
-# Get the deployed app
+# Get the deployed app and secret
 modal_app = App("just-call-bud-prod")
+modal_secret = Secret.from_name("just-call-bud-secrets")
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -231,9 +232,11 @@ def test():
 def health():
     try:
         logger.debug("Health check called")
-        # Test Modal connection
-        with modal_app.run():
+        
+        # Test Modal connection using the secret
+        with modal_app.run(secrets=[modal_secret]):
             response = modal_app.test.remote()
+            
         logger.debug(f"Modal response: {response}")
         return jsonify({
             'status': 'healthy',
