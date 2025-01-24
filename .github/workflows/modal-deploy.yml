@@ -42,4 +42,4 @@ jobs:
           
           # Use clean tokens
           python -m modal token set --token-id "$(cat token_id.txt)" --token-secret "$(cat token_secret.txt)"
-          python -m modal deploy modal_functions.py 
+          python -m modal deploy modal_functions.py
