@@ -85,6 +85,15 @@ def clear_messages():
     messages = []
     return jsonify({'status': 'success'})
 
+@app.route('/test', methods=['POST'])
+def test():
+    try:
+        logger.info("Test endpoint called")
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        logger.error(f"Test endpoint error: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 port = int(os.environ.get('PORT', 5001))
 
 if __name__ == '__main__':
