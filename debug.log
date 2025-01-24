@@ -151,3 +151,9 @@ INFO:__main__:Successfully got AI response
 INFO:__main__:Stored AI response
 INFO:__main__:Sending response back to client
 INFO:werkzeug:127.0.0.1 - - [24/Jan/2025 13:24:37] "POST /api/chat HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [24/Jan/2025 13:26:03] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [24/Jan/2025 13:26:03] "[36mGET /static/bud-logo.jpg HTTP/1.1[0m" 304 -
+INFO:__main__:Test endpoint called!
+INFO:__main__:Form data: {}
+INFO:werkzeug:127.0.0.1 - - [24/Jan/2025 13:26:04] "POST /test HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [24/Jan/2025 13:26:04] "GET /api/messages HTTP/1.1" 200 -
