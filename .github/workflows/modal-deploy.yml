@@ -20,10 +20,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install modal urllib3 requests
           
-      - name: Verify Modal token
+      - name: Verify Modal token format
         run: |
-          echo "Modal token ID length: ${#MODAL_TOKEN_ID}"
-          echo "Modal token secret length: ${#MODAL_TOKEN_SECRET}"
+          if [[ ! "$MODAL_TOKEN_ID" =~ ^ak-[a-zA-Z0-9]+$ ]]; then
+            echo "Error: Invalid Modal token ID format"
+            exit 1
+          fi
+          if [[ ! "$MODAL_TOKEN_SECRET" =~ ^mo-[a-zA-Z0-9]+$ ]]; then
+            echo "Error: Invalid Modal token secret format"
+            exit 1
+          fi
+          echo "Token formats look valid"
         env:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
@@ -33,5 +40,10 @@ jobs:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
         run: |
-          python -m modal token set --token-id "$MODAL_TOKEN_ID" --token-secret "$MODAL_TOKEN_SECRET"
+          # Create clean token file
+          echo -n "$MODAL_TOKEN_ID" > token_id.txt
+          echo -n "$MODAL_TOKEN_SECRET" > token_secret.txt
+          
+          # Use clean tokens
+          python -m modal token set --token-id "$(cat token_id.txt)" --token-secret "$(cat token_secret.txt)"
           python -m modal deploy modal_functions.py 
