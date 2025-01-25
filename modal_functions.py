@@ -9,11 +9,14 @@ import os
 from modal import App, Image, Secret
 
 def create_image():
-    return modal.Image.debian_slim().pip_install(["requests"])
+    return (
+        modal.Image.debian_slim()
+        .pip_install(["urllib3", "requests"])
+    )
 
 app = modal.App("just-call-bud-prod")
 
-@app.function()
+@app.function(image=create_image())
 async def get_llama_response(prompt: str):
     return f"Test response to: {prompt}"
 
