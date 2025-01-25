@@ -23,24 +23,21 @@ USE_MODAL = os.getenv('FLASK_ENV') == 'production'
 logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 
 # Initialize Modal globally
-modal_app = None
+modal_app = modal.App("just-call-bud-prod")
 modal_initialized = False
 
 def init_modal():
     global modal_app, modal_initialized
     try:
         logger.info("=== Starting Modal Initialization ===")
-        modal_app = modal.App.lookup("just-call-bud-prod")
-        logger.info(f"Found app: {modal_app}")
-        logger.info(f"App dir: {dir(modal_app)}")
-        logger.info(f"App functions: {modal_app.registered_functions}")
         
-        if 'get_llama_response' in modal_app.registered_functions:
-            logger.info("Found get_llama_response function")
-            modal_initialized = True
-        else:
-            logger.error("Function not found on app")
-            logger.error(f"Available functions: {modal_app.registered_functions}")
+        # Define the function locally
+        @modal_app.function()
+        async def get_llama_response(prompt: str):
+            return f"Test response to: {prompt}"
+            
+        logger.info("Modal function defined")
+        modal_initialized = True
             
     except Exception as e:
         logger.error(f"Modal initialization error: {str(e)}")
@@ -64,8 +61,7 @@ async def chat():
         
         if USE_MODAL:
             logger.info("Using Modal in production...")
-            if not modal_initialized or not modal_app:
-                logger.error("Modal not initialized")
+            if not modal_initialized:
                 raise Exception("Modal not properly initialized")
             
             logger.info("Calling Modal function...")
