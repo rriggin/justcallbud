@@ -29,6 +29,7 @@ modal_initialized = False
 def init_modal():
     global modal_app, modal_initialized
     try:
+        logger.info("=== Starting Modal Initialization ===")
         modal_app = modal.App.lookup("just-call-bud-prod")
         logger.info(f"Found app: {modal_app}")
         logger.info(f"App dir: {dir(modal_app)}")
@@ -40,10 +41,17 @@ def init_modal():
         if modal_app:
             modal_initialized = True
             logger.info("Modal initialized successfully")
+            # Try to access function directly after initialization
+            if hasattr(modal_app, 'get_llama_response'):
+                logger.info("Found get_llama_response function")
+            else:
+                logger.error("get_llama_response function not found after initialization")
     except Exception as e:
         logger.error(f"Modal initialization error: {str(e)}")
+        logger.error(f"Full error details: {repr(e)}")
 
-# Initialize Modal when app starts
+# Force initialization at startup
+logger.info("=== Forcing Modal Initialization ===")
 init_modal()
 
 @app.route('/')
@@ -61,7 +69,14 @@ def chat():
         logger.info(f"Received prompt: {prompt}")
         
         logger.info("Calling Modal function...")
-        response = modal_app.get_llama_response.remote(prompt).result()
+        # Try to get function from registered_functions
+        if 'get_llama_response' in modal_app.registered_functions:
+            func = modal_app.registered_functions['get_llama_response']
+            response = func.remote(prompt).result()
+        else:
+            logger.error(f"Available functions: {modal_app.registered_functions}")
+            raise Exception("Function not found in registered functions")
+            
         logger.info(f"Modal response received: {response}")
         
         if not response:
