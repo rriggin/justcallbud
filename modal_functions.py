@@ -24,6 +24,8 @@ app = modal.App("just-call-bud-prod", image=create_image())
 )
 async def get_llama_response(prompt: str):
     import requests
+    import subprocess
+    import time
     
     # Start Ollama and wait for it
     subprocess.Popen(['ollama', 'serve'])
@@ -42,7 +44,7 @@ async def get_llama_response(prompt: str):
             }, timeout=60)
         
         result = response.json()
-        print(f"Llama response: {result}")  # Add logging
+        print(f"Llama response: {result}")
         return result['response']
         
     except Exception as e:
