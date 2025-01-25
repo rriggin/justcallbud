@@ -6,6 +6,7 @@ import logging
 import requests
 import sys
 import time
+import modal
 
 # Enhanced logging
 logging.basicConfig(
