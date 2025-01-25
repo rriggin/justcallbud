@@ -29,4 +29,4 @@ jobs:
           python -m modal deploy modal_functions.py
           
           echo "Testing deployment..."
-          python -m modal run modal_functions.py --prompt "test message"
+          python -m modal run modal_functions.py::test_function
