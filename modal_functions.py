@@ -9,13 +9,21 @@ import os
 from modal import App, Image, Secret
 import requests
 
-# Set up the LLM image
-MODEL = modal.Image.from_registry("ghcr.io/modal-labs/llama2-7b-chat-hf-q4f32_1")
+def create_image():
+    return (
+        modal.Image.debian_slim()
+        .pip_install([
+            "torch",
+            "transformers",
+            "accelerate",
+            "safetensors"
+        ])
+    )
 
 app = modal.App("just-call-bud-prod")
 
 @app.function(
-    image=MODEL,
+    image=create_image(),
     gpu="A10G",
     timeout=120
 )
