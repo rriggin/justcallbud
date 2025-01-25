@@ -27,30 +27,12 @@ modal_app = None
 modal_initialized = False
 
 def init_modal():
-    global modal_app, modal_initialized
-    if USE_MODAL:
-        try:
-            logger.info("=== Starting Modal Initialization ===")
-            logger.info(f"FLASK_ENV: {os.getenv('FLASK_ENV')}")
-            
-            token_id = os.getenv('MODAL_TOKEN_ID', '')
-            logger.info(f"Token ID present: {bool(token_id)} (first 4 chars: {token_id[:4] if token_id else 'none'})")
-            
-            from modal import App
-            logger.info("Modal imported successfully")
-            
-            modal_app = App.lookup("just-call-bud-prod")
-            logger.info(f"Modal app lookup successful: {modal_app}")
-            
-            if hasattr(modal_app, 'get_llama_response'):
-                logger.info("Found get_llama_response function")
-                modal_initialized = True
-            else:
-                logger.error("Required functions not found in Modal app")
-                logger.info(f"Available functions: {modal_app.registered_functions}")
-                
-        except Exception as e:
-            logger.error(f"Modal initialization error: {str(e)}", exc_info=True)
+    try:
+        stub = modal.Stub.from_name("just-call-bud-prod")
+        return stub.get_llama_response
+    except Exception as e:
+        logger.error(f"Modal initialization error: {str(e)}")
+        return None
 
 # Initialize Modal when app starts
 init_modal()

@@ -25,10 +25,7 @@ jobs:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
         run: |
-          echo "Setting Modal token..."
           python -m modal token set --token-id $MODAL_TOKEN_ID --token-secret $MODAL_TOKEN_SECRET
-          
-          echo "Deploying functions..."
           python -m modal deploy modal_functions.py
           
           echo "Testing deployment..."
