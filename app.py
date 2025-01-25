@@ -26,31 +26,33 @@ logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 modal_app = None
 modal_initialized = False
 
-if USE_MODAL:
-    try:
-        logger.info("=== Starting Modal Initialization ===")
-        logger.info(f"FLASK_ENV: {os.getenv('FLASK_ENV')}")
-        
-        # Import Modal components
-        from modal import App
-        logger.info("Modal imported successfully")
-        
-        # Try to get the app
-        modal_app = App.lookup("just-call-bud-prod")
-        logger.info(f"Modal app lookup successful: {modal_app}")
-        
-        # NEW: Check what functions are registered
-        logger.info(f"Registered functions: {modal_app.registered_functions}")
-        
-        if 'get_llama_response' in modal_app.registered_functions:
-            logger.info("Found get_llama_response function")
-            modal_initialized = True
-        else:
-            logger.error("Required functions not found in Modal app")
-            logger.info(f"Available functions: {list(modal_app.registered_functions.keys())}")
+def init_modal():
+    global modal_app, modal_initialized
+    if USE_MODAL:
+        try:
+            logger.info("=== Starting Modal Initialization ===")
+            logger.info(f"FLASK_ENV: {os.getenv('FLASK_ENV')}")
             
-    except Exception as e:
-        logger.error(f"Modal initialization error: {str(e)}", exc_info=True)
+            from modal import App
+            logger.info("Modal imported successfully")
+            
+            modal_app = App.lookup("just-call-bud-prod")
+            logger.info(f"Modal app lookup successful: {modal_app}")
+            
+            logger.info(f"Registered functions: {modal_app.registered_functions}")
+            
+            if 'get_llama_response' in modal_app.registered_functions:
+                logger.info("Found get_llama_response function")
+                modal_initialized = True
+            else:
+                logger.error("Required functions not found in Modal app")
+                logger.info(f"Available functions: {list(modal_app.registered_functions.keys())}")
+                
+        except Exception as e:
+            logger.error(f"Modal initialization error: {str(e)}", exc_info=True)
+
+# Initialize Modal when app starts
+init_modal()
 
 @app.route('/')
 def home():

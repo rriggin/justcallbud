@@ -4,11 +4,14 @@ services:
     env: python
     buildCommand: |
       pip install -r requirements.txt
+      echo "=== Setting Modal Token ==="
       python3 -m modal token set --token-id $MODAL_TOKEN_ID --token-secret $MODAL_TOKEN_SECRET
+      echo "=== Checking Modal Token ==="
+      python3 -m modal token list
       echo "=== Deploying Modal Functions ==="
-      python3 -m modal deploy modal_functions.py --name just-call-bud-prod
+      python3 -m modal deploy modal_functions.py --name just-call-bud-prod --show-traces
       echo "=== Verifying Deployment ==="
-      python3 -m modal app list
+      python3 -m modal app list --verbose
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 4 --timeout 120
     healthCheckPath: /health
     envVars:
