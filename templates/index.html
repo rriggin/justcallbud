@@ -135,37 +135,16 @@
         const removeImageBtn = document.getElementById('remove-image');
 
         async function loadMessages() {
-            const response = await fetch('/api/messages');
-            const messages = await response.json();
-            if (messages.length === 0) {
-                // Only show welcome message if no messages exist
-                messagesContainer.innerHTML = `
-                    <div class="flex items-start gap-6 py-4 text-gray-500">
-                        <img src="{{ url_for('static', filename='bud-logo.jpg') }}" alt="Bud Logo" class="w-20 h-20 rounded-full object-cover flex-shrink-0">
-                        <div class="pt-2">
-                            <p class="text-lg font-medium">Hi, I'm Bud. Your AI Handyman. Ask me anything. 👋</p>
-                            <p class="text-sm mb-2">Ask me anything about home maintenance and repairs.</p>
-                        </div>
-                    </div>
-
-                    <!-- Typing Indicator -->
-                    <div id="typing-indicator" class="hidden">
-                        <div class="flex justify-start mb-4">
-                            <div class="max-w-[85%] bg-white rounded-lg px-6 py-4 shadow-sm border border-gray-100">
-                                <div class="flex items-center gap-2">
-                                    <img src="{{ url_for('static', filename='bud-logo.jpg') }}" alt="Bud Logo" class="w-8 h-8 rounded-full">
-                                    <div class="flex gap-1">
-                                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                                        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            } else {
+            try {
+                const response = await fetch('/api/messages');
+                if (!response.ok) {
+                    console.log('No messages found');
+                    return;
+                }
+                const messages = await response.json();
                 messages.forEach(message => addMessageToUI(message));
+            } catch (error) {
+                console.log('Error loading messages:', error);
             }
         }
 
