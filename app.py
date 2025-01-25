@@ -27,9 +27,22 @@ modal_app = None
 modal_initialized = False
 
 def init_modal():
+    global modal_app, modal_initialized
     try:
-        stub = modal.Stub.from_name("just-call-bud-prod")
-        return stub.get_llama_response
+        logger.info("=== Starting Modal Initialization ===")
+        app = modal.App.lookup("just-call-bud-prod")
+        logger.info(f"Found app: {app}")
+        
+        # Get the function directly
+        get_llama = getattr(app, 'get_llama_response', None)
+        if get_llama:
+            logger.info("Found get_llama_response function")
+            modal_initialized = True
+            return get_llama
+        else:
+            logger.error("Function not found on app")
+            return None
+            
     except Exception as e:
         logger.error(f"Modal initialization error: {str(e)}")
         return None
