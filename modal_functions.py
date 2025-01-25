@@ -9,47 +9,13 @@ import os
 from modal import Stub, Image, Secret
 
 def create_image():
-    return (
-        modal.Image.debian_slim()
-        .apt_install("curl")
-        .run_commands("curl -fsSL https://ollama.com/install.sh | sh")
-        .pip_install(["requests"])
-    )
+    return modal.Image.debian_slim().pip_install(["requests"])
 
-app = modal.App("just-call-bud-prod", image=create_image())
+app = modal.App("just-call-bud-prod")
 
-@app.function(
-    gpu="T4",
-    secrets=[modal.Secret.from_name("just-call-bud-secrets")]
-)
+@app.function(gpu="T4")
 async def get_llama_response(prompt: str):
-    import requests
-    import subprocess
-    import time
-    
-    # Start Ollama and wait for it
-    subprocess.Popen(['ollama', 'serve'])
-    time.sleep(5)  # Wait for Ollama to start
-    
-    try:
-        # Pull model if not exists
-        subprocess.run(['ollama', 'pull', 'llama2'])
-        
-        # Make the request
-        response = requests.post('http://localhost:11434/api/generate', 
-            json={
-                "model": "llama2",
-                "prompt": prompt,
-                "stream": False
-            }, timeout=60)
-        
-        result = response.json()
-        print(f"Llama response: {result}")
-        return result['response']
-        
-    except Exception as e:
-        print(f"Error in get_llama_response: {str(e)}")
-        raise
+    return f"Test response to: {prompt}"  # Simple test response
 
 @app.function()
 async def test():

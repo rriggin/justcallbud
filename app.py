@@ -27,24 +27,13 @@ modal_app = None
 if USE_MODAL:
     try:
         from modal import App
-        # Initialize Modal with retries
-        for _ in range(3):  # Try 3 times
-            try:
-                modal_app = App.lookup("just-call-bud-prod")
-                # Verify Modal is working
-                if hasattr(modal_app, 'get_llama_response'):
-                    logger.info("Modal initialized successfully")
-                    break
-            except Exception as retry_error:
-                logger.warning(f"Modal retry error: {str(retry_error)}")
-                time.sleep(1)  # Wait before retrying
-        
-        if not modal_app or not hasattr(modal_app, 'get_llama_response'):
-            raise Exception("Could not initialize Modal after retries")
-            
+        modal_app = App.lookup("just-call-bud-prod")
+        # Test Modal connection
+        logger.info("Testing Modal connection...")
+        test_response = modal_app.test.remote()
+        logger.info(f"Modal test response: {test_response}")
     except Exception as e:
         logger.error(f"Modal initialization error: {str(e)}", exc_info=True)
-        # Don't raise here, let the app start anyway
 
 @app.route('/')
 def home():
