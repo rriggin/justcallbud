@@ -10,16 +10,35 @@ from modal import App, Image, Secret
 import requests
 
 def create_image():
-    return (
-        modal.Image.debian_slim()
-        .pip_install(["requests"])
-    )
+    return modal.Image.debian_slim()
 
 app = modal.App("just-call-bud-prod")
 
-@app.function(image=create_image())
+stub = modal.Stub()
+MODEL = modal.Image.from_registry("ghcr.io/modal-labs/llama2-7b-chat-hf-q4f32_1")
+
+@stub.cls(gpu="A10G", image=MODEL)
+class LLM:
+    def __enter__(self):
+        import torch
+        from transformers import AutoTokenizer, AutoModelForCausalGeneration
+        self.tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
+        self.model = AutoModelForCausalGeneration.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
+        
+    def generate(self, prompt: str):
+        inputs = self.tokenizer(prompt, return_tensors="pt").to("cuda")
+        outputs = self.model.generate(**inputs, max_length=200)
+        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+@app.function(
+    image=MODEL,
+    gpu="A10G",
+    timeout=120
+)
 async def get_llama_response(prompt: str):
-    # Format the prompt for our handyman assistant
+    import torch
+    from transformers import AutoTokenizer, AutoModelForCausalGeneration
+    
     formatted_prompt = f"""You are Bud, a friendly and knowledgeable AI handyman assistant. 
     You help people with home maintenance and repair questions.
     You provide clear, practical advice and always prioritize safety.
@@ -28,17 +47,16 @@ async def get_llama_response(prompt: str):
     
     Assistant: """
     
-    # Call Ollama API
-    response = requests.post(
-        'http://localhost:11434/api/generate',
-        json={
-            "model": "llama2",
-            "prompt": formatted_prompt,
-            "stream": False
-        }
-    ).json()
+    # Load model and tokenizer
+    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
+    model = AutoModelForCausalGeneration.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
     
-    return response['response']
+    # Generate response
+    inputs = tokenizer(formatted_prompt, return_tensors="pt").to("cuda")
+    outputs = model.generate(**inputs, max_length=200)
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
+    return response
 
 @app.function(image=create_image())
 async def test_function():
