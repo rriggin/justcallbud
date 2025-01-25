@@ -23,29 +23,17 @@ USE_MODAL = os.getenv('FLASK_ENV') == 'production'
 logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 
 # Initialize Modal globally
-modal_app = None
+modal_function = None
 modal_initialized = False
 
 def init_modal():
-    global modal_app, modal_initialized
+    global modal_function, modal_initialized
     try:
         logger.info("=== Starting Modal Initialization ===")
-        modal_app = modal.App.lookup("just-call-bud-prod")
-        logger.info(f"Found app: {modal_app}")
-        logger.info(f"App dir: {dir(modal_app)}")
-        
-        # Try different ways to access the function
-        logger.info(f"Functions via registered_functions: {modal_app.registered_functions}")
-        logger.info(f"Functions via dir: {[f for f in dir(modal_app) if not f.startswith('_')]}")
-        
-        if modal_app:
+        modal_function = modal.Function.lookup("just-call-bud-prod", "get_llama_response")
+        if modal_function:
             modal_initialized = True
-            logger.info("Modal initialized successfully")
-            # Try to access function directly after initialization
-            if hasattr(modal_app, 'get_llama_response'):
-                logger.info("Found get_llama_response function")
-            else:
-                logger.error("get_llama_response function not found after initialization")
+            logger.info("Modal function found and initialized successfully")
     except Exception as e:
         logger.error(f"Modal initialization error: {str(e)}")
         logger.error(f"Full error details: {repr(e)}")
@@ -69,14 +57,7 @@ def chat():
         logger.info(f"Received prompt: {prompt}")
         
         logger.info("Calling Modal function...")
-        # Try to get function from registered_functions
-        if 'get_llama_response' in modal_app.registered_functions:
-            func = modal_app.registered_functions['get_llama_response']
-            response = func.remote(prompt).result()
-        else:
-            logger.error(f"Available functions: {modal_app.registered_functions}")
-            raise Exception("Function not found in registered functions")
-            
+        response = modal_function.remote(prompt).result()
         logger.info(f"Modal response received: {response}")
         
         if not response:
