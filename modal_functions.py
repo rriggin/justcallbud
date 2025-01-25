@@ -20,6 +20,11 @@ app = modal.App("just-call-bud-prod")
 async def get_llama_response(prompt: str):
     return f"Test response to: {prompt}"
 
+@app.function(image=create_image())
+async def test_function():
+    """Test if functions are being registered"""
+    return "Test function works"
+
 if __name__ == "__main__":
     print("=== Testing Modal Deployment ===")
     with app.run():
