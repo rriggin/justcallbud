@@ -30,11 +30,12 @@ if USE_MODAL:
     try:
         logger.info("=== Starting Modal Initialization ===")
         logger.info(f"FLASK_ENV: {os.getenv('FLASK_ENV')}")
-        logger.info(f"Modal token present: {bool(modal.token.get_token())}")
         
+        # Import Modal components
         from modal import App
         logger.info("Modal imported successfully")
         
+        # Try to get the app
         modal_app = App.lookup("just-call-bud-prod")
         logger.info(f"Modal app lookup successful: {modal_app}")
         
@@ -56,7 +57,6 @@ if USE_MODAL:
             
     except Exception as e:
         logger.error(f"Modal initialization error: {str(e)}", exc_info=True)
-        # Don't raise, let the app continue
 
 @app.route('/')
 def home():
