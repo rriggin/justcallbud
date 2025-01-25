@@ -44,7 +44,7 @@ def home():
     return render_template('index.html')
 
 @app.route('/api/chat', methods=['POST'])
-async def chat():
+def chat():
     if not modal_initialized:
         logger.error("Modal not initialized")
         return jsonify({"error": "Modal not initialized"}), 500
@@ -54,7 +54,7 @@ async def chat():
         logger.info(f"Received prompt: {prompt}")
         
         logger.info("Calling Modal function...")
-        response = await modal_app.get_llama_response.remote(prompt)
+        response = modal_app.get_llama_response.remote(prompt).result()
         logger.info(f"Modal response received: {response}")
         
         if not response:
