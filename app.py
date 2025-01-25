@@ -57,7 +57,7 @@ def chat():
         logger.info(f"Received prompt: {prompt}")
         
         logger.info("Calling Modal function...")
-        response = modal_function.remote(prompt).result()
+        response = modal_function.remote(prompt)
         logger.info(f"Modal response received: {response}")
         
         if not response:
