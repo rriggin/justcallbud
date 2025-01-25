@@ -7,18 +7,38 @@ import time
 import subprocess
 import os
 from modal import App, Image, Secret
+import requests
 
 def create_image():
     return (
         modal.Image.debian_slim()
-        .pip_install(["urllib3", "requests"])
+        .pip_install(["requests"])
     )
 
 app = modal.App("just-call-bud-prod")
 
 @app.function(image=create_image())
 async def get_llama_response(prompt: str):
-    return f"Test response to: {prompt}"
+    # Format the prompt for our handyman assistant
+    formatted_prompt = f"""You are Bud, a friendly and knowledgeable AI handyman assistant. 
+    You help people with home maintenance and repair questions.
+    You provide clear, practical advice and always prioritize safety.
+    
+    User: {prompt}
+    
+    Assistant: """
+    
+    # Call Ollama API
+    response = requests.post(
+        'http://localhost:11434/api/generate',
+        json={
+            "model": "llama2",
+            "prompt": formatted_prompt,
+            "stream": False
+        }
+    ).json()
+    
+    return response['response']
 
 @app.function(image=create_image())
 async def test_function():
