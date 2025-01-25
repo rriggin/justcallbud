@@ -23,6 +23,7 @@ logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 
 # Initialize Modal globally
 modal_app = None
+modal_initialized = False
 
 if USE_MODAL:
     try:
@@ -35,16 +36,19 @@ if USE_MODAL:
         missing_functions = [f for f in required_functions if not hasattr(modal_app, f)]
         
         if missing_functions:
-            raise Exception(f"Missing Modal functions: {missing_functions}")
+            logger.error(f"Missing Modal functions: {missing_functions}")
+        else:
+            # Test connection
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            test_response = loop.run_until_complete(modal_app.test.remote())
+            logger.info(f"Modal test response: {test_response}")
+            loop.close()
+            modal_initialized = True
             
-        # Test connection
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        test_response = loop.run_until_complete(modal_app.test.remote())
-        logger.info(f"Modal test response: {test_response}")
-        loop.close()
     except Exception as e:
         logger.error(f"Modal initialization error: {str(e)}", exc_info=True)
+        # Don't raise, let the app continue
 
 @app.route('/')
 def home():
@@ -118,15 +122,13 @@ def clear_messages():
 @app.route('/health')
 def health():
     try:
-        # Check if Modal is initialized in production
-        if USE_MODAL:
-            if not hasattr(modal_app, 'get_llama_response'):
-                raise Exception("Modal not properly initialized")
-            logger.info("Modal health check: OK")
-
+        if USE_MODAL and not modal_initialized:
+            raise Exception("Modal not properly initialized")
+            
         return jsonify({
             'status': 'healthy',
             'environment': 'production' if USE_MODAL else 'development',
+            'modal_status': 'initialized' if modal_initialized else 'not initialized',
             'timestamp': datetime.now().isoformat()
         })
     except Exception as e:
@@ -134,6 +136,7 @@ def health():
         return jsonify({
             'status': 'unhealthy',
             'error': str(e),
+            'modal_status': 'not initialized',
             'timestamp': datetime.now().isoformat()
         }), 500
 
