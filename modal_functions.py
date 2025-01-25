@@ -6,7 +6,7 @@ import modal
 import time
 import subprocess
 import os
-from modal import Stub, Image, Secret
+from modal import App, Image, Secret
 
 def create_image():
     return modal.Image.debian_slim().pip_install(["requests"])
@@ -26,6 +26,4 @@ if __name__ == "__main__":
             print(f"Success! Response: {response}")
         except Exception as e:
             print(f"Error: {str(e)}")
-            raise
-
-# The test function can still be used by other parts of the app 
+            raise 
