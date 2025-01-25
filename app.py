@@ -39,21 +39,15 @@ if USE_MODAL:
         modal_app = App.lookup("just-call-bud-prod")
         logger.info(f"Modal app lookup successful: {modal_app}")
         
-        # Test connection with more detail
-        logger.info("Attempting to call test function...")
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            test_response = loop.run_until_complete(modal_app.test.remote())
-            logger.info(f"Modal test response: {test_response}")
+        # NEW: Check what functions are registered
+        logger.info(f"Registered functions: {modal_app.registered_functions}")
+        
+        if 'get_llama_response' in modal_app.registered_functions:
+            logger.info("Found get_llama_response function")
             modal_initialized = True
-        except AttributeError as ae:
-            logger.error(f"Function not found error: {str(ae)}")
-            logger.info(f"Available attributes: {dir(modal_app)}")
-        except Exception as func_error:
-            logger.error(f"Function call error: {str(func_error)}")
-        finally:
-            loop.close()
+        else:
+            logger.error("Required functions not found in Modal app")
+            logger.info(f"Available functions: {list(modal_app.registered_functions.keys())}")
             
     except Exception as e:
         logger.error(f"Modal initialization error: {str(e)}", exc_info=True)
