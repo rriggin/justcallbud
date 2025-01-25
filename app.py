@@ -3,19 +3,29 @@ from datetime import datetime
 import os
 import logging
 import requests
+import sys
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
+# Enhanced logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
 # Use Modal in production, local Ollama in development
 USE_MODAL = os.getenv('FLASK_ENV') == 'production'
+logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 
 if USE_MODAL:
-    from modal import App
-    modal_app = App.lookup("just-call-bud-prod")
+    try:
+        from modal import App
+        modal_app = App.lookup("just-call-bud-prod")
+        logger.info("Modal initialized successfully")
+    except Exception as e:
+        logger.error(f"Modal initialization error: {str(e)}", exc_info=True)
 
 @app.route('/')
 def home():
@@ -36,9 +46,9 @@ async def chat():
             try:
                 response = await modal_app.get_llama_response.remote(prompt)
                 content = response
-                logger.info(f"Modal response: {content[:100]}...")
+                logger.info(f"Modal response received: {content[:100]}...")
             except Exception as modal_error:
-                logger.error(f"Modal error: {str(modal_error)}")
+                logger.error(f"Modal error: {str(modal_error)}", exc_info=True)
                 raise
         else:
             logger.info("Using local Ollama...")
