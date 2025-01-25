@@ -27,24 +27,31 @@ modal_initialized = False
 
 if USE_MODAL:
     try:
+        logger.info("=== Starting Modal Initialization ===")
+        logger.info(f"FLASK_ENV: {os.getenv('FLASK_ENV')}")
+        logger.info(f"Modal token present: {bool(modal.token.get_token())}")
+        
         from modal import App
+        logger.info("Modal imported successfully")
+        
         modal_app = App.lookup("just-call-bud-prod")
-        logger.info("Testing Modal connection...")
+        logger.info(f"Modal app lookup successful: {modal_app}")
         
-        # Check for required functions
-        required_functions = ['test', 'get_llama_response']
-        missing_functions = [f for f in required_functions if not hasattr(modal_app, f)]
-        
-        if missing_functions:
-            logger.error(f"Missing Modal functions: {missing_functions}")
-        else:
-            # Test connection
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        # Test connection with more detail
+        logger.info("Attempting to call test function...")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
             test_response = loop.run_until_complete(modal_app.test.remote())
             logger.info(f"Modal test response: {test_response}")
-            loop.close()
             modal_initialized = True
+        except AttributeError as ae:
+            logger.error(f"Function not found error: {str(ae)}")
+            logger.info(f"Available attributes: {dir(modal_app)}")
+        except Exception as func_error:
+            logger.error(f"Function call error: {str(func_error)}")
+        finally:
+            loop.close()
             
     except Exception as e:
         logger.error(f"Modal initialization error: {str(e)}", exc_info=True)
