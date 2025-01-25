@@ -20,7 +20,9 @@ Just Call Bud is a web application that connects users with an AI assistant spec
 - Database: In-memory (temporary)
 
 ## Todos
--  deploy to the web
+-  deploy to github
+-  deploy to the web 
 -  build functionality for the ad space
 -  add lead gen buttons in line, connect to a live handyman?
-  
+-  make facebook page and integrate llama chat message thing
+-  
