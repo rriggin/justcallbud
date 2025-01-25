@@ -33,20 +33,24 @@ def init_modal():
             logger.info("=== Starting Modal Initialization ===")
             logger.info(f"FLASK_ENV: {os.getenv('FLASK_ENV')}")
             
-            from modal import App
+            token_id = os.getenv('MODAL_TOKEN_ID', '')
+            logger.info(f"Token ID present: {bool(token_id)} (first 4 chars: {token_id[:4] if token_id else 'none'})")
+            
+            from modal import Stub  # Change from App to Stub
             logger.info("Modal imported successfully")
             
-            modal_app = App.lookup("just-call-bud-prod")
-            logger.info(f"Modal app lookup successful: {modal_app}")
-            
+            modal_app = Stub.lookup("just-call-bud-prod")  # Look up Stub instead of App
+            logger.info(f"Modal stub lookup successful: {modal_app}")
+            logger.info(f"Stub name: {modal_app.name}")
+            logger.info(f"Stub dir: {dir(modal_app)}")
             logger.info(f"Registered functions: {modal_app.registered_functions}")
             
-            if 'get_llama_response' in modal_app.registered_functions:
+            if hasattr(modal_app, 'get_llama_response'):  # Check for function differently
                 logger.info("Found get_llama_response function")
                 modal_initialized = True
             else:
-                logger.error("Required functions not found in Modal app")
-                logger.info(f"Available functions: {list(modal_app.registered_functions.keys())}")
+                logger.error("Required functions not found in Modal stub")
+                logger.info(f"Available attributes: {dir(modal_app)}")
                 
         except Exception as e:
             logger.error(f"Modal initialization error: {str(e)}", exc_info=True)

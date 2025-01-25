@@ -28,8 +28,11 @@ jobs:
           echo "Setting Modal token..."
           python -m modal token set --token-id $MODAL_TOKEN_ID --token-secret $MODAL_TOKEN_SECRET
           
-          echo "Deploying functions..."
-          python -m modal deploy modal_functions.py
+          echo "Verifying token..."
+          python -m modal token list
           
-          echo "Verifying deployment..."
-          python check_modal.py
+          echo "Deploying functions..."
+          python -m modal deploy modal_functions.py --show-logs
+          
+          echo "Running deployment test..."
+          python modal_functions.py
