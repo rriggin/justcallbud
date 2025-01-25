@@ -23,22 +23,16 @@ USE_MODAL = os.getenv('FLASK_ENV') == 'production'
 logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 
 # Initialize Modal globally
-modal_app = modal.App("just-call-bud-prod")
+modal_app = None
 modal_initialized = False
 
 def init_modal():
     global modal_app, modal_initialized
     try:
-        logger.info("=== Starting Modal Initialization ===")
-        
-        # Define the function locally
-        @modal_app.function()
-        async def get_llama_response(prompt: str):
-            return f"Test response to: {prompt}"
-            
-        logger.info("Modal function defined")
-        modal_initialized = True
-            
+        modal_app = modal.App.lookup("just-call-bud-prod")
+        if modal_app:
+            modal_initialized = True
+            logger.info("Modal initialized successfully")
     except Exception as e:
         logger.error(f"Modal initialization error: {str(e)}")
 
@@ -51,45 +45,16 @@ def home():
 
 @app.route('/api/chat', methods=['POST'])
 async def chat():
-    try:
-        user_message = request.form.get('content', '')
-        logger.info(f"Received message: {user_message[:100]}...")
-
-        prompt = f"""You are Bud, a friendly and knowledgeable AI assistant...
-        User: {user_message}
-        Assistant: """
+    if not modal_initialized:
+        return jsonify({"error": "Modal not initialized"}), 500
         
-        if USE_MODAL:
-            logger.info("Using Modal in production...")
-            if not modal_initialized:
-                raise Exception("Modal not properly initialized")
-            
-            logger.info("Calling Modal function...")
-            response = await modal_app.get_llama_response.remote(prompt)
-            content = response
-            logger.info(f"Modal response received: {content[:100]}...")
-        else:
-            logger.info("Using local Ollama...")
-            # Use asyncio for local requests
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(None, lambda: requests.post(
-                'http://localhost:11434/api/generate',
-                json={"model": "llama2", "prompt": prompt, "stream": False}
-            ).json())
-            content = response['response']
-
-        return jsonify({
-            'content': content,
-            'isUser': False,
-            'timestamp': datetime.now().isoformat()
-        })
+    try:
+        prompt = request.form.get('content', '')
+        response = await modal_app.get_llama_response.remote(prompt)
+        return jsonify({"response": response})
     except Exception as e:
-        logger.error(f"Chat error: {str(e)}", exc_info=True)
-        return jsonify({
-            'content': f"Error: {str(e)}",
-            'isUser': False,
-            'timestamp': datetime.now().isoformat()
-        }), 500
+        logger.error(f"Chat error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/test', methods=['POST'])
 def test():

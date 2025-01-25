@@ -1,44 +1,33 @@
 import modal
-import sys
-import os
-from modal.cli import token
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def check_modal():
-    print("=== Modal Status ===")
     try:
-        token_obj = token.get_token()
-        print(f"Token present: {bool(token_obj)}")
-        if token_obj:
-            print(f"Token ID: {token_obj.id}")
-    except Exception as e:
-        print(f"Token error: {str(e)}")
-    
-    try:
-        print("\n=== Looking up app ===")
+        logger.info("=== Checking Modal Setup ===")
+        
+        # Look up the app
         app = modal.App.lookup("just-call-bud-prod")
-        print(f"App found: {app}")
+        logger.info(f"Found app: {app}")
         
-        print("\n=== App Details ===")
-        print(f"App name: {app.name}")
-        print(f"App functions: {app.registered_functions}")
-        print(f"App dir: {dir(app)}")
+        # Check functions
+        logger.info(f"Registered functions: {app.registered_functions}")
         
-        # Try to get function directly
-        print("\n=== Function Access ===")
+        # Try to get the function
         if hasattr(app, 'get_llama_response'):
-            print("Found get_llama_response via hasattr")
-        else:
-            print("Could not find get_llama_response via hasattr")
+            logger.info("Found get_llama_response function")
             
-        try:
-            func = app.registered_functions['get_llama_response']
-            print(f"Found function: {func}")
-        except KeyError:
-            print("Function not in registered_functions")
+            # Try to call it
+            with app.run():
+                response = app.get_llama_response.remote("test message")
+                logger.info(f"Test response: {response}")
+        else:
+            logger.error("get_llama_response function not found")
             
     except Exception as e:
-        print(f"\nError: {str(e)}")
-        sys.exit(1)
+        logger.error(f"Error checking Modal: {str(e)}")
 
 if __name__ == "__main__":
     check_modal() 
