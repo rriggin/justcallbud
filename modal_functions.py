@@ -1,7 +1,3 @@
-import warnings
-import urllib3
-warnings.filterwarnings("ignore", category=urllib3.exceptions.NotOpenSSLWarning)
-
 import modal
 import time
 import subprocess
@@ -17,6 +13,7 @@ def create_image():
             "transformers",
             "accelerate",
             "safetensors",
+            "requests",
             "urllib3"
         ])
     )
