@@ -48,7 +48,7 @@ async def get_llama_response(prompt: str):
     
     return response
 
-@app.function(image=modal.Image.debian_slim())
+@app.function(image=create_image())
 async def test_function():
     """Test if functions are being registered"""
     return "Test function works"
