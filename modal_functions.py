@@ -27,7 +27,10 @@ app = modal.App("just-call-bud-prod")
 )
 async def get_llama_response(prompt: str):
     import torch
-    from transformers import AutoTokenizer, AutoModelForCausalGeneration
+    from transformers import (
+        AutoTokenizer,
+        AutoModelForCausalLM
+    )
     
     formatted_prompt = f"""You are Bud, a friendly and knowledgeable AI handyman assistant. 
     You help people with home maintenance and repair questions.
@@ -39,7 +42,7 @@ async def get_llama_response(prompt: str):
     
     # Load model and tokenizer
     tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
-    model = AutoModelForCausalGeneration.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
+    model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
     
     # Generate response
     inputs = tokenizer(formatted_prompt, return_tensors="pt").to("cuda")
