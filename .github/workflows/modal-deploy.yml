@@ -20,17 +20,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install modal urllib3 requests
           
-      - name: Verify Modal token format
-        run: |
-          if [[ ! "$MODAL_TOKEN_ID" =~ ^ak-[a-zA-Z0-9]+$ ]]; then
-            echo "Error: Invalid Modal token ID format"
-            exit 1
-          fi
-          echo "Token formats look valid"
-        env:
-          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
-          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
-          
       - name: Deploy to Modal
         env:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}

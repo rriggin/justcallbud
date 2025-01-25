@@ -6,8 +6,8 @@ import modal
 import time
 import subprocess
 import os
+from modal import Stub, Image, Secret
 
-# Define the image
 def create_image():
     return (
         modal.Image.debian_slim()
@@ -16,7 +16,6 @@ def create_image():
         .pip_install(["requests"])
     )
 
-# Create the app with the image - this exports 'app'
 app = modal.App("just-call-bud-prod", image=create_image())
 
 @app.function(
@@ -30,26 +29,29 @@ async def get_llama_response(prompt: str):
     subprocess.Popen(['ollama', 'serve'])
     time.sleep(5)  # Wait for Ollama to start
     
-    # Pull model if not exists
-    subprocess.run(['ollama', 'pull', 'llama2'])
-    
-    # Now make the request
-    response = requests.post('http://localhost:11434/api/generate', 
-        json={
-            "model": "llama2",
-            "prompt": prompt,
-            "stream": False,
-            "options": {
-                "num_ctx": 2048,
-                "num_thread": 8,
-                "temperature": 0.7,
-                "top_k": 20,
-                "top_p": 0.9,
-                "repeat_penalty": 1.1
-            }
-        }, timeout=60)
-    
-    return response.json()['response']
+    try:
+        # Pull model if not exists
+        subprocess.run(['ollama', 'pull', 'llama2'])
+        
+        # Make the request
+        response = requests.post('http://localhost:11434/api/generate', 
+            json={
+                "model": "llama2",
+                "prompt": prompt,
+                "stream": False
+            }, timeout=60)
+        
+        result = response.json()
+        print(f"Llama response: {result}")  # Add logging
+        return result['response']
+        
+    except Exception as e:
+        print(f"Error in get_llama_response: {str(e)}")
+        raise
+
+@app.function()
+async def test():
+    return "Modal connection successful!"
 
 # For testing
 if __name__ == "__main__":
@@ -57,7 +59,4 @@ if __name__ == "__main__":
         response = get_llama_response.remote("Hi, how are you?")
         print(f"Test response: {response}")
 
-# The test function can still be used by other parts of the app
-@app.function()
-async def test():
-    return "Modal connection successful!"  # Simple response to verify connection 
+# The test function can still be used by other parts of the app 

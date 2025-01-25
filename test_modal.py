@@ -1,7 +1,11 @@
 import modal
 
-def main():
-    print("Modal is configured with token:", bool(modal.token.get_token()))
+stub = modal.Stub("test-app")
+
+@stub.function()
+def hello():
+    return "Hello from Modal!"
 
 if __name__ == "__main__":
-    main() 
+    with stub.run():
+        print(hello.remote()) 
