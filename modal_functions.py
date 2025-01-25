@@ -13,18 +13,19 @@ def create_image():
 
 app = modal.App("just-call-bud-prod")
 
-@app.function(gpu="T4")
-async def get_llama_response(prompt: str):
-    return f"Test response to: {prompt}"  # Simple test response
-
-@app.function()
+@app.function()  # Test function without GPU
 async def test():
     return "Modal connection successful!"
+
+@app.function(gpu="T4")  # Main function with GPU
+async def get_llama_response(prompt: str):
+    return f"Test response to: {prompt}"
 
 # For testing
 if __name__ == "__main__":
     with app.run():
-        response = get_llama_response.remote("Hi, how are you?")
-        print(f"Test response: {response}")
+        print("Testing connection...")
+        test_result = test.remote()
+        print(f"Test result: {test_result}")
 
 # The test function can still be used by other parts of the app 

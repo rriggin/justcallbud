@@ -28,9 +28,16 @@ if USE_MODAL:
     try:
         from modal import App
         modal_app = App.lookup("just-call-bud-prod")
-        # Test Modal connection
         logger.info("Testing Modal connection...")
-        # Create event loop for async initialization
+        
+        # Check for required functions
+        required_functions = ['test', 'get_llama_response']
+        missing_functions = [f for f in required_functions if not hasattr(modal_app, f)]
+        
+        if missing_functions:
+            raise Exception(f"Missing Modal functions: {missing_functions}")
+            
+        # Test connection
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         test_response = loop.run_until_complete(modal_app.test.remote())
