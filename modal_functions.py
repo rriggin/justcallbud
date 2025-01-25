@@ -2,23 +2,26 @@ import warnings
 import urllib3
 warnings.filterwarnings("ignore", category=urllib3.exceptions.NotOpenSSLWarning)
 
-from modal import Image, Secret, Stub, web_endpoint
+import modal
+import time
+import subprocess
+import os
 
 # Define the image
 def create_image():
     return (
-        Image.debian_slim()
+        modal.Image.debian_slim()
         .apt_install("curl")
         .run_commands("curl -fsSL https://ollama.com/install.sh | sh")
         .pip_install(["requests"])
     )
 
-# Create the stub with the image
-stub = Stub("just-call-bud-prod", image=create_image())
+# Create the app with the image - this exports 'app'
+app = modal.App("just-call-bud-prod", image=create_image())
 
-@stub.function(
+@app.function(
     gpu="T4",
-    secrets=[Secret.from_name("just-call-bud-secrets")]
+    secrets=[modal.Secret.from_name("just-call-bud-secrets")]
 )
 async def get_llama_response(prompt: str):
     import requests
@@ -50,11 +53,11 @@ async def get_llama_response(prompt: str):
 
 # For testing
 if __name__ == "__main__":
-    with stub.run():
+    with app.run():
         response = get_llama_response.remote("Hi, how are you?")
         print(f"Test response: {response}")
 
 # The test function can still be used by other parts of the app
-@stub.function()
+@app.function()
 async def test():
     return "Modal connection successful!"  # Simple response to verify connection 
