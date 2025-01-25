@@ -5,9 +5,11 @@ services:
     buildCommand: |
       pip install -r requirements.txt
       python3 -m modal token set --token-id $MODAL_TOKEN_ID --token-secret $MODAL_TOKEN_SECRET
-      echo "=== Checking Modal Status ==="
-      python3 -m modal app list
+      echo "=== Deploying Modal Functions ==="
+      python3 modal_functions.py  # Run the file first to test
       python3 -m modal deploy modal_functions.py
+      echo "=== Checking Deployment ==="
+      python3 -m modal app list
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 4 --timeout 120
     healthCheckPath: /health
     envVars:

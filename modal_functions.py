@@ -25,7 +25,7 @@ async def get_llama_response(prompt: str):
 if __name__ == "__main__":
     with app.run():
         print("Testing connection...")
-        test_result = test.remote()
-        print(f"Test result: {test_result}")
+        response = get_llama_response.remote("test")
+        print(f"Test result: {response}")
 
 # The test function can still be used by other parts of the app 
