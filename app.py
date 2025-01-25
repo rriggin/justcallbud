@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify
+import asyncio
 from datetime import datetime
 import os
 import logging
@@ -44,6 +45,12 @@ async def chat():
         if USE_MODAL:
             logger.info("Using Modal in production...")
             try:
+                # Make sure Modal is properly initialized
+                if not hasattr(modal_app, 'get_llama_response'):
+                    logger.error("Modal function not found")
+                    raise Exception("Modal not properly initialized")
+                
+                # Call Modal function
                 response = await modal_app.get_llama_response.remote(prompt)
                 content = response
                 logger.info(f"Modal response received: {content[:100]}...")
@@ -52,9 +59,12 @@ async def chat():
                 raise
         else:
             logger.info("Using local Ollama...")
-            response = requests.post('http://localhost:11434/api/generate', 
+            # Use asyncio for local requests
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(None, lambda: requests.post(
+                'http://localhost:11434/api/generate',
                 json={"model": "llama2", "prompt": prompt, "stream": False}
-            ).json()
+            ).json())
             content = response['response']
 
         return jsonify({
@@ -86,6 +96,28 @@ def get_messages():
 @app.route('/api/messages', methods=['DELETE'])
 def clear_messages():
     return jsonify({'status': 'success'})
+
+@app.route('/health')
+def health():
+    try:
+        # Check if Modal is initialized in production
+        if USE_MODAL:
+            if not hasattr(modal_app, 'get_llama_response'):
+                raise Exception("Modal not properly initialized")
+            logger.info("Modal health check: OK")
+
+        return jsonify({
+            'status': 'healthy',
+            'environment': 'production' if USE_MODAL else 'development',
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 port = int(os.environ.get('PORT', 5001))
 
