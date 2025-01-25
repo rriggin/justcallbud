@@ -30,6 +30,13 @@ def init_modal():
     global modal_app, modal_initialized
     try:
         modal_app = modal.App.lookup("just-call-bud-prod")
+        logger.info(f"Found app: {modal_app}")
+        logger.info(f"App dir: {dir(modal_app)}")
+        
+        # Try different ways to access the function
+        logger.info(f"Functions via registered_functions: {modal_app.registered_functions}")
+        logger.info(f"Functions via dir: {[f for f in dir(modal_app) if not f.startswith('_')]}")
+        
         if modal_app:
             modal_initialized = True
             logger.info("Modal initialized successfully")
