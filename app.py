@@ -46,15 +46,34 @@ def home():
 @app.route('/api/chat', methods=['POST'])
 async def chat():
     if not modal_initialized:
+        logger.error("Modal not initialized")
         return jsonify({"error": "Modal not initialized"}), 500
         
     try:
         prompt = request.form.get('content', '')
+        logger.info(f"Received prompt: {prompt}")
+        
+        logger.info("Calling Modal function...")
         response = await modal_app.get_llama_response.remote(prompt)
-        return jsonify({"response": response})
+        logger.info(f"Modal response received: {response}")
+        
+        if not response:
+            logger.error("Empty response from Modal")
+            return jsonify({"error": "Empty response from AI"}), 500
+            
+        return jsonify({
+            "content": response,
+            "isUser": False,
+            "timestamp": datetime.now().isoformat()
+        })
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Full error details: {repr(e)}")
+        return jsonify({
+            "content": f"Error: {str(e)}",
+            "isUser": False,
+            "timestamp": datetime.now().isoformat()
+        }), 500
 
 @app.route('/test', methods=['POST'])
 def test():
