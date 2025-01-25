@@ -16,7 +16,8 @@ def create_image():
             "torch",
             "transformers",
             "accelerate",
-            "safetensors"
+            "safetensors",
+            "urllib3"
         ])
     )
 
