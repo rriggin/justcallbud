@@ -25,16 +25,23 @@ def home():
 async def chat():
     try:
         user_message = request.form.get('content', '')
+        logger.info(f"Received message: {user_message[:100]}...")
+
         prompt = f"""You are Bud, a friendly and knowledgeable AI assistant...
         User: {user_message}
         Assistant: """
         
         if USE_MODAL:
-            # Production: Use Modal
-            response = await modal_app.get_llama_response.remote(prompt)
-            content = response
+            logger.info("Using Modal in production...")
+            try:
+                response = await modal_app.get_llama_response.remote(prompt)
+                content = response
+                logger.info(f"Modal response: {content[:100]}...")
+            except Exception as modal_error:
+                logger.error(f"Modal error: {str(modal_error)}")
+                raise
         else:
-            # Development: Use local Ollama
+            logger.info("Using local Ollama...")
             response = requests.post('http://localhost:11434/api/generate', 
                 json={"model": "llama2", "prompt": prompt, "stream": False}
             ).json()
@@ -46,6 +53,7 @@ async def chat():
             'timestamp': datetime.now().isoformat()
         })
     except Exception as e:
+        logger.error(f"Chat error: {str(e)}", exc_info=True)
         return jsonify({
             'content': f"Error: {str(e)}",
             'isUser': False,
