@@ -30,8 +30,12 @@ if USE_MODAL:
         modal_app = App.lookup("just-call-bud-prod")
         # Test Modal connection
         logger.info("Testing Modal connection...")
-        test_response = modal_app.test.remote()
+        # Create event loop for async initialization
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        test_response = loop.run_until_complete(modal_app.test.remote())
         logger.info(f"Modal test response: {test_response}")
+        loop.close()
     except Exception as e:
         logger.error(f"Modal initialization error: {str(e)}", exc_info=True)
 
