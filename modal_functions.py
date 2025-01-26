@@ -46,8 +46,8 @@ async def get_llama_response(prompt: str):
     Assistant: """
     
     # Now load model and tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
-    model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
+    tokenizer = AutoTokenizer.from_pretrained("NousResearch/Llama-2-7b-hf")
+    model = AutoModelForCausalLM.from_pretrained("NousResearch/Llama-2-7b-hf")
     
     # Generate response
     inputs = tokenizer(formatted_prompt, return_tensors="pt").to("cuda")
