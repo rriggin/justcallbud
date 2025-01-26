@@ -30,32 +30,17 @@ app = modal.App("just-call-bud-prod")
     retries=2,
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
-async def get_llama_response(prompt: str, history: list = None):
+async def get_llama_response(prompt: str):
     import torch
-    from transformers import (
-        AutoTokenizer,
-        AutoModelForCausalLM
-    )
+    from transformers import AutoTokenizer, AutoModelForCausalLM
     
-    # Set HF token for both transformers and hub
+    # Set HF token
     hf_token = os.getenv("HUGGINGFACE_TOKEN")
     huggingface_hub.login(token=hf_token)
-    
-    if history is None:
-        history = []
-    
-    # Build context from history
-    conversation = "You are Bud, a friendly and knowledgeable AI handyman assistant.\n"
-    for msg in history:
-        conversation += f"User: {msg['user']}\nAssistant: {msg['assistant']}\n"
-    
-    # Add current prompt
-    conversation += f"User: {prompt}\nAssistant: "
     
     # Cache model and tokenizer
     global _model, _tokenizer
     if '_model' not in globals():
-        # Load model with memory optimization
         tokenizer = AutoTokenizer.from_pretrained(
             "meta-llama/Llama-2-7b-chat-hf",
             token=hf_token
@@ -69,16 +54,16 @@ async def get_llama_response(prompt: str, history: list = None):
         _model = model
         _tokenizer = tokenizer
     
-    # Generate response
-    inputs = _tokenizer(conversation, return_tensors="pt")
+    # Use simple prompt for now
+    formatted_prompt = f"""You are Bud...{prompt}...Assistant: """
+    
+    # Use cached model/tokenizer
+    inputs = _tokenizer(formatted_prompt, return_tensors="pt")
     inputs = {k: v.to("cuda") for k, v in inputs.items()}
     outputs = _model.generate(**inputs, max_length=200)
-    full_response = _tokenizer.decode(outputs[0].cpu(), skip_special_tokens=True)
+    response = _tokenizer.decode(outputs[0].cpu(), skip_special_tokens=True)
     
-    # Extract only the assistant's response
-    assistant_response = full_response.split("Assistant: ")[-1].strip()
-    
-    return assistant_response
+    return response
 
 @app.function(image=create_image())
 async def test_function():

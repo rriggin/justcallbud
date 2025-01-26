@@ -31,9 +31,6 @@ logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 modal_function = None
 modal_initialized = False
 
-# Use a simple in-memory store for now
-conversation_store = {}
-
 def init_modal():
     global modal_function, modal_initialized
     try:
@@ -57,27 +54,10 @@ def home():
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:
-        # Get or create conversation ID from session
-        conversation_id = session.get('conversation_id')
-        if not conversation_id:
-            conversation_id = str(uuid.uuid4())
-            session['conversation_id'] = conversation_id
-            conversation_store[conversation_id] = []
-            
         prompt = request.form.get('content', '')
         logger.info(f"Received prompt: {prompt}")
         
-        # Get history for this conversation
-        history = conversation_store.get(conversation_id, [])
-        
-        # Call Modal with history
-        response = modal_function.remote(prompt, history=history)
-        
-        # Store the new interaction
-        conversation_store[conversation_id].append({
-            'user': prompt,
-            'assistant': response
-        })
+        response = modal_function.remote(prompt)
         
         return jsonify({
             "content": response,
