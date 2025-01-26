@@ -26,9 +26,11 @@ app = modal.App("just-call-bud-prod")
     image=create_image(),
     gpu="A10G",
     timeout=120,
+    keep_warm=1,
+    retries=2,
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
-async def get_llama_response(prompt: str):
+async def get_llama_response(prompt: str, history: list = None):
     import torch
     from transformers import (
         AutoTokenizer,
@@ -39,31 +41,39 @@ async def get_llama_response(prompt: str):
     hf_token = os.getenv("HUGGINGFACE_TOKEN")
     huggingface_hub.login(token=hf_token)
     
-    formatted_prompt = f"""You are Bud, a friendly and knowledgeable AI handyman assistant. 
-    You help people with home maintenance and repair questions.
-    You provide clear, practical advice and always prioritize safety.
+    if history is None:
+        history = []
     
-    User: {prompt}
+    # Build context from history
+    conversation = "You are Bud, a friendly and knowledgeable AI handyman assistant.\n"
+    for msg in history:
+        conversation += f"User: {msg['user']}\nAssistant: {msg['assistant']}\n"
     
-    Assistant: """
+    # Add current prompt
+    conversation += f"User: {prompt}\nAssistant: "
     
-    # Load model with memory optimization
-    tokenizer = AutoTokenizer.from_pretrained(
-        "meta-llama/Llama-2-7b-chat-hf",
-        token=hf_token
-    )
-    model = AutoModelForCausalLM.from_pretrained(
-        "meta-llama/Llama-2-7b-chat-hf",
-        token=hf_token,
-        device_map="auto",
-        torch_dtype=torch.float16
-    ).to("cuda")
+    # Cache model and tokenizer
+    global _model, _tokenizer
+    if '_model' not in globals():
+        # Load model with memory optimization
+        tokenizer = AutoTokenizer.from_pretrained(
+            "meta-llama/Llama-2-7b-chat-hf",
+            token=hf_token
+        )
+        model = AutoModelForCausalLM.from_pretrained(
+            "meta-llama/Llama-2-7b-chat-hf",
+            token=hf_token,
+            device_map="auto",
+            torch_dtype=torch.float16
+        ).to("cuda")
+        _model = model
+        _tokenizer = tokenizer
     
     # Generate response
-    inputs = tokenizer(formatted_prompt, return_tensors="pt")
+    inputs = _tokenizer(conversation, return_tensors="pt")
     inputs = {k: v.to("cuda") for k, v in inputs.items()}
-    outputs = model.generate(**inputs, max_length=200)
-    full_response = tokenizer.decode(outputs[0].cpu(), skip_special_tokens=True)
+    outputs = _model.generate(**inputs, max_length=200)
+    full_response = _tokenizer.decode(outputs[0].cpu(), skip_special_tokens=True)
     
     # Extract only the assistant's response
     assistant_response = full_response.split("Assistant: ")[-1].strip()

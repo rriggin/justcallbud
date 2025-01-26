@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session
 import asyncio
 from datetime import datetime
 import os
@@ -7,6 +7,7 @@ import requests
 import sys
 import time
 import modal
+import uuid
 
 # Enhanced logging
 logging.basicConfig(
@@ -17,6 +18,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-key-please-change')
 
 # Use Modal in production, local Ollama in development
 USE_MODAL = os.getenv('FLASK_ENV') == 'production'
@@ -25,6 +27,9 @@ logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 # Initialize Modal globally
 modal_function = None
 modal_initialized = False
+
+# Use a simple in-memory store for now
+conversation_store = {}
 
 def init_modal():
     global modal_function, modal_initialized
@@ -48,22 +53,29 @@ def home():
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    if not modal_initialized:
-        logger.error("Modal not initialized")
-        return jsonify({"error": "Modal not initialized"}), 500
-        
     try:
+        # Get or create conversation ID from session
+        conversation_id = session.get('conversation_id')
+        if not conversation_id:
+            conversation_id = str(uuid.uuid4())
+            session['conversation_id'] = conversation_id
+            conversation_store[conversation_id] = []
+            
         prompt = request.form.get('content', '')
         logger.info(f"Received prompt: {prompt}")
         
-        logger.info("Calling Modal function...")
-        response = modal_function.remote(prompt)
-        logger.info(f"Modal response received: {response}")
+        # Get history for this conversation
+        history = conversation_store.get(conversation_id, [])
         
-        if not response:
-            logger.error("Empty response from Modal")
-            return jsonify({"error": "Empty response from AI"}), 500
-            
+        # Call Modal with history
+        response = modal_function.remote(prompt, history=history)
+        
+        # Store the new interaction
+        conversation_store[conversation_id].append({
+            'user': prompt,
+            'assistant': response
+        })
+        
         return jsonify({
             "content": response,
             "isUser": False,
@@ -115,6 +127,24 @@ def health():
             'modal_status': 'not initialized',
             'timestamp': datetime.now().isoformat()
         }), 500
+
+@app.route('/api/model-info')
+def model_info():
+    return jsonify({
+        "models": [
+            {
+                "name": "meta-llama/Llama-2-7b-chat-hf",
+                "model": "Llama-2-7b-chat-hf",
+                "details": {
+                    "family": "llama",
+                    "parameter_size": "7B",
+                    "provider": "Meta/Hugging Face",
+                    "deployment": "Modal GPU (A10G)",
+                    "quantization": "float16"  # From our torch_dtype setting
+                }
+            }
+        ]
+    })
 
 port = int(os.environ.get('PORT', 5001))
 

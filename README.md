@@ -29,6 +29,8 @@ Just Call Bud is a web application that connects users with an AI assistant spec
    - speed up Render deployment:
      - investigate slow git clone/checkout
      - optimize dependency installation
+     - analyze which ML packages can be safely removed
+     - implement better dependency management
      - consider Docker pre-build
    - investigate Render deploy hook reliability
    - optimize model loading:
