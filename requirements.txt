@@ -8,3 +8,6 @@ flask[async]
 asgiref
 urllib3
 huggingface-hub
+torch
+transformers
+accelerate  # Helps with GPU optimization
