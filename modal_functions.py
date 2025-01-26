@@ -4,6 +4,7 @@ import subprocess
 import os
 from modal import App, Image, Secret
 import requests
+import huggingface_hub
 
 def create_image():
     return (
@@ -34,8 +35,9 @@ async def get_llama_response(prompt: str):
         AutoModelForCausalLM
     )
     
-    # Set HF token before loading model
-    os.environ["HUGGINGFACE_TOKEN"] = os.getenv("HUGGINGFACE_TOKEN")
+    # Set HF token for both transformers and hub
+    hf_token = os.getenv("HUGGINGFACE_TOKEN")
+    huggingface_hub.login(token=hf_token)
     
     formatted_prompt = f"""You are Bud, a friendly and knowledgeable AI handyman assistant. 
     You help people with home maintenance and repair questions.
@@ -45,9 +47,15 @@ async def get_llama_response(prompt: str):
     
     Assistant: """
     
-    # Load model and tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
-    model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-chat-hf").to("cuda")  # Move model to GPU
+    # Load model with explicit token
+    tokenizer = AutoTokenizer.from_pretrained(
+        "meta-llama/Llama-2-7b-chat-hf",
+        token=hf_token
+    )
+    model = AutoModelForCausalLM.from_pretrained(
+        "meta-llama/Llama-2-7b-chat-hf",
+        token=hf_token
+    ).to("cuda")
     
     # Generate response
     inputs = tokenizer(formatted_prompt, return_tensors="pt")
