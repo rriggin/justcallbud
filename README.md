@@ -26,3 +26,23 @@ Just Call Bud is a web application that connects users with an AI assistant spec
 -  add lead gen buttons in line, connect to a live handyman?
 -  make facebook page and integrate llama chat message thing
 -  
+
+## Overview
+JustCallBud is an AI handyman assistant powered by Llama 2, deployed on Modal and Render.
+
+### Tech Stack
+- **AI Model**: Meta's Llama 2 (7B parameters)
+- **Compute**: Modal with GPU support
+- **Frontend**: Flask + HTML/CSS
+- **Deployment**: GitHub Actions → Modal → Render
+
+### Features
+- Real-time AI responses to home maintenance questions
+- Safety-first advice
+- GPU-accelerated inference
+
+### Development
+Requires:
+- Modal account
+- Hugging Face account with Llama 2 access
+- Render account
