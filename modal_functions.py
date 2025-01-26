@@ -47,14 +47,16 @@ async def get_llama_response(prompt: str):
     
     Assistant: """
     
-    # Load model with explicit token
+    # Load model with memory optimization
     tokenizer = AutoTokenizer.from_pretrained(
         "meta-llama/Llama-2-7b-chat-hf",
         token=hf_token
     )
     model = AutoModelForCausalLM.from_pretrained(
         "meta-llama/Llama-2-7b-chat-hf",
-        token=hf_token
+        token=hf_token,
+        device_map="auto",
+        torch_dtype=torch.float16
     ).to("cuda")
     
     # Generate response
