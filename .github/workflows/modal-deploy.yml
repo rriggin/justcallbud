@@ -33,4 +33,7 @@ jobs:
         env:
           RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
-          curl -v -X POST $RENDER_DEPLOY_HOOK || echo "Deploy hook failed"
+          # Cancel any existing deploys first
+          curl -X POST $RENDER_DEPLOY_HOOK/cancel || true
+          sleep 5  # Wait for cancellation
+          curl -v -X POST $RENDER_DEPLOY_HOOK
