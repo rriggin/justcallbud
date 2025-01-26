@@ -61,11 +61,14 @@ async def get_llama_response(prompt: str):
     
     # Generate response
     inputs = tokenizer(formatted_prompt, return_tensors="pt")
-    inputs = {k: v.to("cuda") for k, v in inputs.items()}  # Move inputs to GPU
+    inputs = {k: v.to("cuda") for k, v in inputs.items()}
     outputs = model.generate(**inputs, max_length=200)
-    response = tokenizer.decode(outputs[0].cpu(), skip_special_tokens=True)  # Move back to CPU for decoding
+    full_response = tokenizer.decode(outputs[0].cpu(), skip_special_tokens=True)
     
-    return response
+    # Extract only the assistant's response
+    assistant_response = full_response.split("Assistant: ")[-1].strip()
+    
+    return assistant_response
 
 @app.function(image=create_image())
 async def test_function():
