@@ -21,7 +21,7 @@ app = Flask(__name__)
 # Generate a random secret key if not provided
 if not os.environ.get('FLASK_SECRET_KEY'):
     logger.warning("FLASK_SECRET_KEY not set, using random key")
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
+app.secret_key = 'dev-key-please-change'  # Simple for now
 
 # Use Modal in production, local Ollama in development
 USE_MODAL = os.getenv('FLASK_ENV') == 'production'
