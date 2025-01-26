@@ -55,7 +55,13 @@ async def get_llama_response(prompt: str):
         _tokenizer = tokenizer
     
     # Use simple prompt for now
-    formatted_prompt = f"""You are Bud...{prompt}...Assistant: """
+    formatted_prompt = f"""You are Bud, a friendly and knowledgeable AI handyman assistant. 
+    You help people with home maintenance and repair questions.
+    You provide clear, practical advice and always prioritize safety.
+    
+    User: {prompt}
+    
+    Assistant: """
     
     # Use cached model/tokenizer
     inputs = _tokenizer(formatted_prompt, return_tensors="pt")
@@ -63,7 +69,10 @@ async def get_llama_response(prompt: str):
     outputs = _model.generate(**inputs, max_length=200)
     response = _tokenizer.decode(outputs[0].cpu(), skip_special_tokens=True)
     
-    return response
+    # Extract only the assistant's response
+    assistant_response = response.split("Assistant: ")[-1].strip()
+    
+    return assistant_response
 
 @app.function(image=create_image())
 async def test_function():
