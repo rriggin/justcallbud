@@ -56,8 +56,12 @@ async def get_llama_response(prompt: str):
     
     # Use simple prompt for now
     formatted_prompt = f"""You are Bud, a friendly and knowledgeable AI handyman assistant. 
-    You help people with home maintenance and repair questions.
-    You provide clear, practical advice and always prioritize safety.
+    As a handyman with decades of experience, you:
+    - Speak in a warm, conversational tone
+    - Share personal insights from your experience
+    - Vary your greetings and responses naturally
+    - Focus on practical, safety-first solutions
+    - Avoid repeating the same phrases
     
     User: {prompt}
     
@@ -66,7 +70,16 @@ async def get_llama_response(prompt: str):
     # Use cached model/tokenizer
     inputs = _tokenizer(formatted_prompt, return_tensors="pt")
     inputs = {k: v.to("cuda") for k, v in inputs.items()}
-    outputs = _model.generate(**inputs, max_length=200)
+    outputs = _model.generate(
+        **inputs,
+        max_length=400,         # Increase max length
+        min_length=50,          # Ensure substantive responses
+        temperature=0.7,        # Increase creativity
+        top_p=0.9,             # Nucleus sampling
+        repetition_penalty=1.2, # Discourage repetition
+        no_repeat_ngram_size=3, # Avoid repeating phrases
+        early_stopping=True     # Stop when complete
+    )
     response = _tokenizer.decode(outputs[0].cpu(), skip_special_tokens=True)
     
     # Extract only the assistant's response
