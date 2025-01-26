@@ -70,9 +70,10 @@ async def get_llama_response(prompt: str):
     response = _tokenizer.decode(outputs[0].cpu(), skip_special_tokens=True)
     
     # Extract only the assistant's response
-    assistant_response = response.split("Assistant: ")[-1].strip()
+    # Split at both Assistant: and User: to avoid hallucinated user responses
+    parts = response.split("Assistant: ")[-1].split("User:")[0].strip()
     
-    return assistant_response
+    return parts
 
 @app.function(image=create_image())
 async def test_function():

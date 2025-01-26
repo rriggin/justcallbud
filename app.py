@@ -31,6 +31,9 @@ logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 modal_function = None
 modal_initialized = False
 
+# Store conversations in memory
+conversation_store = {}
+
 def init_modal():
     global modal_function, modal_initialized
     try:
@@ -53,6 +56,12 @@ def home():
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
+    conversation_id = session.get('conversation_id')
+    if not conversation_id:
+        conversation_id = str(uuid.uuid4())
+        session['conversation_id'] = conversation_id
+        conversation_store[conversation_id] = []
+    
     try:
         prompt = request.form.get('content', '')
         logger.info(f"Received prompt: {prompt}")
