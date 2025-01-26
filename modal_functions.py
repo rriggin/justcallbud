@@ -14,7 +14,8 @@ def create_image():
             "accelerate",
             "safetensors",
             "requests",
-            "urllib3"
+            "urllib3",
+            "huggingface-hub"
         ])
     )
 
@@ -23,7 +24,8 @@ app = modal.App("just-call-bud-prod")
 @app.function(
     image=create_image(),
     gpu="A10G",
-    timeout=120
+    timeout=120,
+    secrets=[modal.Secret.from_name("huggingface-secret")]
 )
 async def get_llama_response(prompt: str):
     import torch
@@ -31,6 +33,9 @@ async def get_llama_response(prompt: str):
         AutoTokenizer,
         AutoModelForCausalLM
     )
+    
+    # Set HF token before loading model
+    os.environ["HUGGINGFACE_TOKEN"] = os.getenv("HUGGINGFACE_TOKEN")
     
     formatted_prompt = f"""You are Bud, a friendly and knowledgeable AI handyman assistant. 
     You help people with home maintenance and repair questions.
@@ -40,7 +45,7 @@ async def get_llama_response(prompt: str):
     
     Assistant: """
     
-    # Load model and tokenizer
+    # Now load model and tokenizer
     tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
     model = AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
     
