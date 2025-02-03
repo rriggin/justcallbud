@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, session, Response, stream_with_context
 import asyncio
 from datetime import datetime
 import os
@@ -182,28 +182,14 @@ def chat():
         
         if cached_response:
             logger.info("Cache hit! Using cached response")
-            response_text = cached_response
-        else:
-            logger.info("Cache miss. Generating new response")
-            # Get response using LangChain
-            if USE_MODAL:
-                response_text = modal_function.remote(prompt_text)
-            else:
-                # Create the chain properly
-                chain = prompt | llm
-                response = chain.invoke({
-                    "history": history,
-                    "input": prompt_text
-                })
-                response_text = response.content
-
-            if not response_text:
-                raise ValueError("Empty response from AI model")
-                
-            # Cache the response
-            redis_client.setex(cache_key, CACHE_EXPIRATION, response_text)
-
-        # Get the current max message number for this conversation
+            return Response(
+                stream_cached_response(cached_response),
+                mimetype='text/event-stream'
+            )
+        
+        logger.info("Cache miss. Generating new response")
+        
+        # Get current max message number
         result = supabase.table('messages') \
             .select('message_number') \
             .eq('conversation_id', conversation_id) \
@@ -225,28 +211,50 @@ def chat():
         }
         supabase.table('messages').insert(message_data).execute()
 
-        # Store bot response
-        bot_message_data = {
-            'content': response_text,
-            'is_user': False,
-            'conversation_id': conversation_id,
-            'message_number': current_max_number + 2,
-            'created_at': datetime.now().isoformat()
-        }
-        supabase.table('messages').insert(bot_message_data).execute()
+        def generate():
+            collected_response = []
             
-        return jsonify({
-            "content": response_text,
-            "isUser": False,
-            "timestamp": datetime.now().isoformat()
-        })
-    except ValueError as e:
-        logger.error(f"Validation error: {str(e)}")
-        return jsonify({
-            "content": f"Error: {str(e)}",
-            "isUser": False,
-            "timestamp": datetime.now().isoformat()
-        }), 400
+            if USE_MODAL:
+                response_text = modal_function.remote(prompt_text)
+                yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
+                collected_response = [response_text]
+            else:
+                # Create the chain properly
+                chain = prompt | llm
+                
+                for chunk in chain.stream({
+                    "history": history,
+                    "input": prompt_text
+                }):
+                    if hasattr(chunk, 'content'):
+                        content = chunk.content
+                        collected_response.append(content)
+                        yield f"data: {json.dumps({'content': content, 'done': False})}\n\n"
+
+            # Join all chunks
+            full_response = ''.join(collected_response)
+            
+            # Cache the complete response
+            redis_client.setex(cache_key, CACHE_EXPIRATION, full_response)
+            
+            # Store bot response
+            bot_message_data = {
+                'content': full_response,
+                'is_user': False,
+                'conversation_id': conversation_id,
+                'message_number': current_max_number + 2,
+                'created_at': datetime.now().isoformat()
+            }
+            supabase.table('messages').insert(bot_message_data).execute()
+            
+            # Send done signal
+            yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
+
+        return Response(
+            stream_with_context(generate()),
+            mimetype='text/event-stream'
+        )
+
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
         logger.error(f"Full error details: {repr(e)}")
@@ -255,6 +263,11 @@ def chat():
             "isUser": False,
             "timestamp": datetime.now().isoformat()
         }), 500
+
+def stream_cached_response(response):
+    """Stream a cached response to maintain consistent behavior"""
+    yield f"data: {json.dumps({'content': response, 'done': False})}\n\n"
+    yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
 
 @app.route('/test', methods=['POST'])
 def test():

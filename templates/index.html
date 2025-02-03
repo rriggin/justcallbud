@@ -8,6 +8,51 @@
     <link href="https://unpkg.com/lucide-css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(10px); }
+        }
+        #messages {
+            height: calc(100vh - 200px);
+            scrollbar-width: none;  /* Firefox */
+            -ms-overflow-style: none;  /* Internet Explorer 10+ */
+            padding-bottom: 100px;
+        }
+        #messages::-webkit-scrollbar {
+            display: none;  /* WebKit */
+        }
+        .scroll-indicator {
+            position: fixed;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            width: 24px;
+            height: 24px;
+            background-color: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 50%;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        .scroll-indicator.visible {
+            display: flex !important;
+        }
+        .scroll-indicator:hover {
+            background-color: #f3f4f6;
+            transform: translateX(-50%) translateY(-2px);
+        }
+        .scroll-indicator svg {
+            width: 14px;
+            height: 14px;
+            stroke: #6b7280;
+        }
+    </style>
 </head>
 <body class="min-h-screen bg-gray-50">
     <!-- Header -->
@@ -21,14 +66,14 @@
     <div class="max-w-6xl mx-auto px-4">
         <div class="flex flex-col lg:flex-row gap-8">
             <!-- Main Chat Column -->
-            <main class="flex-1 flex flex-col pr-4">
-                <!-- Messages container -->
-                <div id="messages" class="flex-1 overflow-y-auto pb-32">
+            <main class="flex-1 relative">
+                <!-- Messages Container -->
+                <div id="messages" class="h-full overflow-y-scroll">
                     <div class="flex items-start gap-6 py-4 text-gray-500">
                         <img src="{{ url_for('static', filename='bud-logo.jpg') }}" alt="Bud Logo" class="w-20 h-20 rounded-full object-cover flex-shrink-0">
                         <div class="pt-2">
                             <p class="text-lg font-medium">Hi, I'm Bud. Your AI Handyman. Ask me anything. 👋</p>
-                            <p class="text-sm mb-2">Ask me anything about home maintenance and repairs.</p>
+                            <p class="text-sm mb-2">Feel free to upload photos to help me diagnose the problem.</p>
                         </div>
                     </div>
 
@@ -49,23 +94,23 @@
                     </div>
                 </div>
 
-                <!-- Mobile Advertisement Space -->
-                <!-- Commented out for now
-                <div id="mobile-ad" class="lg:hidden bg-white border border-gray-200 rounded-lg p-4 mx-4 mb-4 hidden">
-                    <p class="text-gray-400 text-center text-sm">Advertisement Space</p>
+                <!-- Scroll Indicator -->
+                <div id="scroll-indicator" class="scroll-indicator">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 14l-7 7-7-7"></path>
+                    </svg>
                 </div>
-                -->
 
                 <!-- Input Form Area -->
-                <div class="fixed bottom-0 left-0 right-0 lg:right-80 bg-gray-50 border-t z-20 shadow-lg">
-                    <div class="max-w-6xl mx-auto px-4 py-4">
+                <div class="fixed bottom-0 left-0 right-0 lg:right-80 bg-gradient-to-t from-white via-white to-transparent">
+                    <div class="max-w-3xl mx-auto p-4">
                         <!-- Input Form -->
-                        <form id="chat-form" class="flex flex-col gap-2">
+                        <form id="chat-form" class="relative bg-white rounded-lg shadow-lg border border-gray-200 mt-12">
                             <!-- Image Preview -->
-                            <div id="image-preview" class="hidden">
+                            <div id="image-preview" class="hidden absolute bottom-full mb-2 left-0">
                                 <div class="relative inline-block">
-                                    <img id="preview-img" class="max-h-32 rounded-lg">
-                                    <button type="button" id="remove-image" class="absolute top-1 right-1 bg-gray-800 bg-opacity-50 text-white rounded-full p-1">
+                                    <img id="preview-img" class="max-h-32 rounded-lg shadow-lg">
+                                    <button type="button" id="remove-image" class="absolute top-1 right-1 bg-gray-800 bg-opacity-50 text-white rounded-full p-1 hover:bg-opacity-70">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <line x1="18" y1="6" x2="6" y2="18"></line>
                                             <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -75,42 +120,39 @@
                             </div>
                             
                             <!-- Input Area -->
-                            <div class="flex gap-2">
-                                <textarea
-                                    id="message-input"
-                                    rows="1"
-                                    placeholder="Type your question here..."
-                                    class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 pl-4 py-2 resize-none overflow-hidden"
-                                ></textarea>
-                                <label class="cursor-pointer bg-gray-100 px-4 rounded-lg hover:bg-gray-200 flex items-center justify-center">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                                        <polyline points="21 15 16 10 5 21"></polyline>
+                            <div class="flex items-end p-2">
+                                <label class="p-2 hover:bg-gray-100 rounded-lg cursor-pointer">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-600">
+                                        <path d="M12 5v14M5 12h14"></path>
                                     </svg>
                                     <input type="file" id="image-upload" class="hidden" accept="image/*">
                                 </label>
+                                <textarea
+                                    id="message-input"
+                                    name="content"
+                                    rows="1"
+                                    placeholder="Message Bud..."
+                                    class="flex-1 mx-3 resize-none overflow-hidden border-0 bg-transparent p-2 focus:ring-0 focus:outline-none"
+                                ></textarea>
                                 <button
                                     type="submit"
-                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    class="p-2 text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M7 13l-2 2 2 2"></path>
-                                        <path d="M17 17H7"></path>
-                                        <path d="M7 3h10l4 4-4 4H7l4-4-4-4z"></path>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="transform rotate-90">
+                                        <path d="M12 19V5M5 12l7-7 7 7"/>
                                     </svg>
                                 </button>
                             </div>
                         </form>
 
                         <!-- Clear Chat Button -->
-                        <div class="flex justify-end mt-2">
+                        <div class="flex justify-center mt-2">
                             <button
                                 id="clear-chat"
                                 type="button"
-                                class="text-gray-500 hover:text-gray-700 text-sm flex items-center gap-1"
+                                class="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <line x1="18" y1="6" x2="6" y2="18"></line>
                                     <line x1="6" y1="6" x2="18" y2="18"></line>
                                 </svg>
@@ -182,6 +224,36 @@
         const previewImg = document.getElementById('preview-img');
         const removeImageBtn = document.getElementById('remove-image');
 
+        // Add this after your existing variable declarations
+        const scrollIndicator = document.getElementById('scroll-indicator');
+        
+        let isStreaming = false;
+
+        function checkScroll() {
+            const { scrollTop, scrollHeight, clientHeight } = messagesContainer;
+            const isNotAtBottom = scrollHeight - scrollTop - clientHeight > 50;
+            
+            if (isStreaming || isNotAtBottom) {
+                scrollIndicator.classList.add('visible');
+                scrollIndicator.classList.remove('hidden');
+            } else {
+                scrollIndicator.classList.remove('visible');
+                scrollIndicator.classList.add('hidden');
+            }
+        }
+
+        // Add scroll event listener
+        messagesContainer.addEventListener('scroll', checkScroll);
+
+        // Check scroll position when new content is added
+        const observer = new MutationObserver(() => {
+            setTimeout(checkScroll, 100);
+        });
+        observer.observe(messagesContainer, { childList: true, subtree: true });
+
+        // Initial check
+        setTimeout(checkScroll, 500);
+
         async function loadMessages() {
             try {
                 const response = await fetch('/api/messages');
@@ -200,22 +272,22 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = `flex ${message.isUser ? 'justify-end' : 'justify-start'} mb-4`;
             
-            // Split into paragraphs and handle numbered lists
-            const formattedContent = message.content
-                .split(/\n\n+/)
-                .map(para => {
-                    // Check if paragraph contains numbered list
-                    if (para.match(/^\d+\./m)) {
-                        // Split into list items and format as an ordered list
-                        const listItems = para.split(/\n/)
-                            .filter(line => line.trim())
-                            .map(line => `<li class="ml-4">${line.replace(/^\d+\.\s*/, '')}</li>`)
-                            .join('');
-                        return `<ol class="list-decimal list-outside mb-4 space-y-2">${listItems}</ol>`;
-                    }
-                    return `<p class="${message.isUser ? '' : 'mb-4 last:mb-0'}">${para.trim()}</p>`;
-                })
-                .join('');
+            // Format the content with proper spacing and lists
+            let formattedContent = message.content;
+            
+            // Handle numbered lists with proper formatting
+            formattedContent = formattedContent.replace(/(\d+)\.\s+([^\n]+)/g, (match, number, text) => {
+                return `<div class="flex gap-2"><span class="flex-shrink-0">${number}.</span><span>${text}</span></div>`;
+            });
+
+            // Split paragraphs and add proper spacing
+            formattedContent = formattedContent.split('\n\n').map(para => {
+                if (para.includes('<div class="flex gap-2">')) {
+                    // If it's a list, wrap it in a list container
+                    return `<div class="space-y-2">${para}</div>`;
+                }
+                return `<p class="mb-4 last:mb-0">${para.trim()}</p>`;
+            }).join('');
             
             // Add message content
             messageDiv.innerHTML = `
@@ -238,10 +310,9 @@
             
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-            // Add event listeners for pill buttons
-            if (!message.isUser) {
+            // Add event listeners for the quote button if it exists
+            if (!message.isUser && message.showContactButton) {
                 const requestQuoteBtn = messageDiv.querySelector('.request-quote');
-                
                 if (requestQuoteBtn) {
                     requestQuoteBtn.addEventListener('click', () => {
                         const template = document.getElementById('quote-form-template');
@@ -288,6 +359,10 @@
             input.style.height = 'auto'; // Reset height for textarea
             
             try {
+                isStreaming = true;
+                scrollIndicator.classList.add('visible');
+                scrollIndicator.classList.remove('hidden');
+
                 // Add user message immediately
                 addMessageToUI({ content, isUser: true });
                 if (currentImage) {
@@ -296,72 +371,110 @@
                     imagePreview.classList.add('hidden');
                 }
 
-                // Show typing indicator
-                const typingIndicator = document.createElement('div');
-                typingIndicator.className = 'flex justify-start mb-4';
-                typingIndicator.innerHTML = `
-                    <div class="max-w-[85%] bg-white rounded-lg px-6 py-4 shadow-sm border border-gray-100">
-                        <div class="flex items-center gap-2">
-                            <img src="{{ url_for('static', filename='bud-logo.jpg') }}" alt="Bud Logo" class="w-8 h-8 rounded-full">
-                            <div class="flex gap-1">
-                                <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                                <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                                <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                messagesContainer.appendChild(typingIndicator);
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
                 input.disabled = true;
                 form.querySelector('button').disabled = true;
 
-                console.log('Creating FormData...');
+                console.log('Sending request to /api/chat...');
                 const formData = new FormData();
                 formData.append('content', content);
                 if (currentImage) {
                     formData.append('image', currentImage);
                 }
-
-                console.log('Sending request to /api/chat...');
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     body: formData
                 });
 
-                console.log('Response status:', response.status);
-
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Server error:', errorText);
-                    throw new Error(`Network response was not ok: ${errorText}`);
+                    throw new Error(`Network response was not ok: ${await response.text()}`);
                 }
 
-                const botMessage = await response.json();
-                console.log('Bot response:', botMessage);
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let responseText = '';
+                let tempMessageDiv = null;
 
-                // Remove typing indicator
-                typingIndicator.remove();
-
-                // Add bot response
-                addMessageToUI(botMessage);
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = JSON.parse(line.slice(5));
+                            if (data.done) {
+                                isStreaming = false;
+                                checkScroll();
+                                if (tempMessageDiv) {
+                                    const messageContainer = tempMessageDiv.querySelector('div');
+                                    messageContainer.innerHTML = `
+                                        ${messageContainer.innerHTML}
+                                        <div class="mt-3 flex justify-center">
+                                            <button class="request-quote px-4 py-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors">
+                                                Contact a local pro
+                                            </button>
+                                        </div>
+                                    `;
+                                }
+                                break;
+                            }
+                            
+                            // Only create the message container when we receive the first content
+                            if (!tempMessageDiv && data.content) {
+                                tempMessageDiv = document.createElement('div');
+                                tempMessageDiv.className = 'flex justify-start mb-4';
+                                tempMessageDiv.innerHTML = `
+                                    <div class="max-w-[85%] rounded-lg px-3 py-2 bg-white text-gray-900 border border-gray-100 shadow-sm">
+                                        <p class="mb-4 last:mb-0"></p>
+                                    </div>
+                                `;
+                                messagesContainer.appendChild(tempMessageDiv);
+                            }
+                            
+                            responseText += data.content;
+                            
+                            if (tempMessageDiv) {
+                                // Format the response text with proper spacing and lists
+                                let formattedText = responseText;
+                                // Handle numbered lists
+                                formattedText = formattedText.replace(/(\d+)\.\s+([^\n]+)/g, (match, number, text) => {
+                                    return `<div class="flex gap-2"><span class="flex-shrink-0">${number}.</span><span>${text}</span></div>`;
+                                });
+                                
+                                // Split paragraphs and add proper spacing
+                                formattedText = formattedText.split('\n\n').map(para => {
+                                    if (para.includes('<div class="flex gap-2">')) {
+                                        return `<div class="space-y-2">${para}</div>`;
+                                    }
+                                    return `<p class="mb-4 last:mb-0">${para.trim()}</p>`;
+                                }).join('');
+                                
+                                tempMessageDiv.querySelector('div').innerHTML = formattedText;
+                                
+                                // Only auto-scroll if we're near the bottom
+                                const { scrollTop, scrollHeight, clientHeight } = messagesContainer;
+                                const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+                                if (isNearBottom) {
+                                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                                }
+                            }
+                        }
+                    }
+                }
 
             } catch (error) {
                 console.error('Full error details:', error);
                 console.error('Error stack:', error.stack);
                 
-                // Remove any existing typing indicator
-                const existingIndicator = messagesContainer.querySelector('.typing-indicator');
-                if (existingIndicator) {
-                    existingIndicator.remove();
-                }
-
                 addMessageToUI({
                     content: "Sorry, there was an error. Please try again.",
                     isUser: false
                 });
             } finally {
+                isStreaming = false;
+                checkScroll();
                 currentImage = null;
                 imagePreview.classList.add('hidden');
                 input.disabled = false;
@@ -533,6 +646,14 @@
                 errorDiv.classList.remove('hidden');
             }
         }
+
+        // Add click handler for the scroll indicator
+        scrollIndicator.addEventListener('click', () => {
+            messagesContainer.scrollTo({
+                top: messagesContainer.scrollHeight,
+                behavior: 'smooth'
+            });
+        });
     </script>
 </body>
 </html>
