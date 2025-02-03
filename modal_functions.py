@@ -36,10 +36,9 @@ prompt = ChatPromptTemplate.from_messages([
     ("human", "{input}")
 ])
 
-stub = modal.Stub("just-call-bud-prod")
-app = modal.App(stub)
+app = modal.App("just-call-bud-prod")
 
-@stub.cls(
+@app.cls(
     image=create_image(),
     gpu="A10G",
     timeout=60,
