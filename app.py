@@ -34,17 +34,10 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app with secret key first
 app = Flask(__name__)
 
-# Get the secret key with detailed logging
-secret_key = os.getenv('FLASK_SECRET_KEY')
-if secret_key:
-    logger.info("Found FLASK_SECRET_KEY in environment")
-    app.secret_key = secret_key
-else:
-    logger.warning("No FLASK_SECRET_KEY found in environment, using development key")
-    app.secret_key = 'dev-only-secret-key-do-not-use-in-production'
-
-logger.info(f"Flask app initialized with secret key length: {len(str(app.secret_key))}")
-logger.info(f"First few characters of secret key: {str(app.secret_key)[:8]}...")
+# Set the secret key directly in the config
+app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY', 'dev-only-secret-key-do-not-use-in-production')
+logger.info("Flask config initialized")
+logger.info(f"Secret key is set: {'yes' if 'SECRET_KEY' in app.config else 'no'}")
 
 # Log environment for debugging
 logger.info(f"FLASK_ENV: {os.getenv('FLASK_ENV')}")
@@ -59,12 +52,18 @@ logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 modal_function = None
 modal_initialized = False
 
-# Initialize Supabase client
-supabase: Client = create_client(
-    os.getenv('SUPABASE_URL'),
-    os.getenv('SUPABASE_KEY')
-)
-logger.info(f"Supabase initialized with URL: {os.getenv('SUPABASE_URL')}")
+# Initialize Supabase client based on environment
+if USE_MODAL:  # Production
+    supabase_url = os.getenv('SUPABASE_URL')
+    supabase_key = os.getenv('SUPABASE_KEY')
+    logger.info("Using production Supabase database")
+else:  # Development
+    supabase_url = os.getenv('SUPABASE_DEV_URL', os.getenv('SUPABASE_URL'))
+    supabase_key = os.getenv('SUPABASE_DEV_KEY', os.getenv('SUPABASE_KEY'))
+    logger.info("Using development Supabase database")
+
+supabase: Client = create_client(supabase_url, supabase_key)
+logger.info(f"Supabase initialized with URL: {supabase_url}")
 
 # Initialize LangChain components
 SYSTEM_PROMPT = """You are Bud, a friendly and knowledgeable AI handyman assistant. 
@@ -101,12 +100,31 @@ else:
     llm = ChatOllama(model="llama2")
     logger.info("Local Ollama initialized for development")
 
-# Initialize Redis client
-redis_client = Redis(host='localhost', port=6379, db=0, decode_responses=True)
+# Initialize Redis client (optional)
+try:
+    redis_url = os.getenv('REDIS_URL')  # Render provides this environment variable
+    if redis_url:
+        # Parse Redis URL and initialize client
+        redis_client = Redis.from_url(redis_url, decode_responses=True)
+        redis_enabled = True
+        logger.info("Redis cache initialized using REDIS_URL")
+    else:
+        # Local development fallback
+        redis_client = Redis(host='localhost', port=6379, db=0, decode_responses=True)
+        redis_enabled = True
+        logger.info("Redis cache initialized using localhost")
+except Exception as e:
+    redis_client = None
+    redis_enabled = False
+    logger.warning(f"Redis cache not available - caching disabled: {str(e)}")
+
 CACHE_EXPIRATION = 3600  # Cache for 1 hour
 
 def get_cache_key(conversation_id, prompt_text, history):
     """Generate a unique cache key based on conversation context"""
+    if not redis_enabled:
+        return None
+        
     # Convert history to a string representation
     history_str = json.dumps([{
         'content': msg.content,
@@ -197,18 +215,19 @@ def chat():
         # Get conversation history
         history = get_conversation_history(conversation_id)
         
-        # Check cache first
+        # Check cache if Redis is enabled
         cache_key = get_cache_key(conversation_id, prompt_text, history)
-        cached_response = redis_client.get(cache_key)
-        
-        if cached_response:
-            logger.info("Cache hit! Using cached response")
-            return Response(
-                stream_cached_response(cached_response),
-                mimetype='text/event-stream'
-            )
-        
-        logger.info("Cache miss. Generating new response")
+        if redis_enabled and cache_key:
+            cached_response = redis_client.get(cache_key)
+            if cached_response:
+                logger.info("Cache hit! Using cached response")
+                return Response(
+                    stream_cached_response(cached_response),
+                    mimetype='text/event-stream'
+                )
+            logger.info("Cache miss. Generating new response")
+        else:
+            logger.info("Caching disabled. Generating new response")
         
         # Get current max message number
         result = supabase.table('messages') \
@@ -256,8 +275,13 @@ def chat():
             # Join all chunks
             full_response = ''.join(collected_response)
             
-            # Cache the complete response
-            redis_client.setex(cache_key, CACHE_EXPIRATION, full_response)
+            # Cache the complete response if Redis is enabled
+            if redis_enabled and cache_key:
+                try:
+                    redis_client.setex(cache_key, CACHE_EXPIRATION, full_response)
+                    logger.info("Response cached successfully")
+                except Exception as e:
+                    logger.error(f"Error caching response: {str(e)}")
             
             # Store bot response
             bot_message_data = {
@@ -461,6 +485,49 @@ def test_supabase():
         logger.error(f"Supabase test error: {str(e)}")
         logger.error(f"Error type: {type(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/test-redis', methods=['GET'])
+def test_redis():
+    try:
+        if not redis_enabled or not redis_client:
+            return jsonify({
+                'status': 'error',
+                'message': 'Redis is not enabled or client is not initialized'
+            }), 500
+
+        # Test basic Redis operations
+        test_key = 'test_key'
+        test_value = 'test_value'
+        
+        # Set a value
+        redis_client.set(test_key, test_value, ex=60)  # expires in 60 seconds
+        
+        # Get the value back
+        retrieved_value = redis_client.get(test_key)
+        
+        # Delete the test key
+        redis_client.delete(test_key)
+        
+        return jsonify({
+            'status': 'success',
+            'connection': 'established',
+            'operations': {
+                'set': 'success',
+                'get': 'success',
+                'retrieved_value': retrieved_value,
+                'delete': 'success'
+            },
+            'redis_url': os.getenv('REDIS_URL', 'not_set')[:20] + '...'  # Only show beginning of URL for security
+        })
+        
+    except Exception as e:
+        logger.error(f"Redis test error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'redis_enabled': redis_enabled,
+            'redis_url_exists': bool(os.getenv('REDIS_URL'))
+        }), 500
 
 port = int(os.environ.get('PORT', 5001))
 
