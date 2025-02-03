@@ -17,14 +17,14 @@ def create_image():
     return (
         modal.Image.debian_slim()
         .pip_install([
-            "torch",
-            "transformers",
-            "langchain",
-            "langchain_core",
-            "accelerate",
-            "huggingface-hub",
-            "einops",  # Required for TinyLlama
-            "safetensors"  # Better model loading
+            "torch==2.1.0",
+            "transformers==4.37.2",
+            "langchain>=0.1.0",
+            "langchain_core>=0.1.30",
+            "accelerate>=0.26.1",
+            "huggingface-hub>=0.19.4",
+            "einops>=0.7.0",
+            "safetensors>=0.4.1"
         ])
     )
 
