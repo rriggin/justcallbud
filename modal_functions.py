@@ -52,7 +52,7 @@ app = modal.App("just-call-bud-prod")
     image=create_image(),
     gpu="A10G",
     timeout=60,
-    secrets=[modal.Secret.from_name("just_call_bud_secrets")]
+    secrets=[modal.Secret.from_name("huggingface-secret")]
 )
 class LLM:
     def __init__(self):
@@ -128,7 +128,7 @@ class LLM:
 
 @app.function(
     image=create_image(),
-    secrets=[modal.Secret.from_name("just_call_bud_secrets")]
+    secrets=[modal.Secret.from_name("huggingface-secret")]
 )
 async def chat(prompt_text: str, history=None) -> str:
     logger.info("Chat function called")
