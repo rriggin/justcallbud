@@ -8,6 +8,9 @@ import sys
 import time
 import modal
 import uuid
+import json
+import hashlib
+from redis import Redis
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import re
@@ -76,6 +79,22 @@ if USE_MODAL:
     llm = ChatOpenAI()  # Will need to be replaced with Modal's function
 else:
     llm = ChatOllama(model="llama2")
+
+# Initialize Redis client
+redis_client = Redis(host='localhost', port=6379, db=0, decode_responses=True)
+CACHE_EXPIRATION = 3600  # Cache for 1 hour
+
+def get_cache_key(conversation_id, prompt_text, history):
+    """Generate a unique cache key based on conversation context"""
+    # Convert history to a string representation
+    history_str = json.dumps([{
+        'content': msg.content,
+        'is_user': isinstance(msg, HumanMessage)
+    } for msg in history])
+    
+    # Create a unique hash of the conversation context
+    context = f"{conversation_id}:{prompt_text}:{history_str}"
+    return f"chat_response:{hashlib.md5(context.encode()).hexdigest()}"
 
 def get_or_create_anonymous_user():
     """Get existing or create new anonymous user session"""
@@ -157,20 +176,32 @@ def chat():
         # Get conversation history
         history = get_conversation_history(conversation_id)
         
-        # Get response using LangChain
-        if USE_MODAL:
-            response_text = modal_function.remote(prompt_text)
+        # Check cache first
+        cache_key = get_cache_key(conversation_id, prompt_text, history)
+        cached_response = redis_client.get(cache_key)
+        
+        if cached_response:
+            logger.info("Cache hit! Using cached response")
+            response_text = cached_response
         else:
-            # Create the chain properly
-            chain = prompt | llm
-            response = chain.invoke({
-                "history": history,
-                "input": prompt_text
-            })
-            response_text = response.content
+            logger.info("Cache miss. Generating new response")
+            # Get response using LangChain
+            if USE_MODAL:
+                response_text = modal_function.remote(prompt_text)
+            else:
+                # Create the chain properly
+                chain = prompt | llm
+                response = chain.invoke({
+                    "history": history,
+                    "input": prompt_text
+                })
+                response_text = response.content
 
-        if not response_text:
-            raise ValueError("Empty response from AI model")
+            if not response_text:
+                raise ValueError("Empty response from AI model")
+                
+            # Cache the response
+            redis_client.setex(cache_key, CACHE_EXPIRATION, response_text)
 
         # Get the current max message number for this conversation
         result = supabase.table('messages') \
