@@ -59,8 +59,7 @@ class LLM:
         logger.info("Initializing LLM class...")
         try:
             # Get Hugging Face token from Modal secrets
-            secrets = modal.Secret.from_name("just_call_bud_secrets")
-            hf_token = secrets.get("HUGGINGFACE_TOKEN")
+            hf_token = str(modal.Secret.from_name("just_call_bud_secrets").get())
             logger.info("Retrieved Hugging Face token")
             
             # Log in to Hugging Face
