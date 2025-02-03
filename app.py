@@ -12,6 +12,11 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 import re
 from email_validator import validate_email, EmailNotValidError
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain.memory import ConversationBufferMemory
+from langchain_community.chat_models import ChatOllama
+from langchain_openai import ChatOpenAI
 
 # Load environment variables from .env
 load_dotenv()
@@ -28,10 +33,7 @@ logger = logging.getLogger(__name__)
 logger.info(f"FLASK_ENV: {os.getenv('FLASK_ENV')}")
 
 app = Flask(__name__)
-# Generate a random secret key if not provided
-if not os.environ.get('FLASK_SECRET_KEY'):
-    logger.warning("FLASK_SECRET_KEY not set, using random key")
-app.secret_key = 'dev-key-please-change'  # Simple for now
+app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 # Use Modal unless explicitly in development
 USE_MODAL = os.getenv('FLASK_ENV') != 'development'
@@ -43,9 +45,6 @@ logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 modal_function = None
 modal_initialized = False
 
-# Store conversations in memory
-conversation_store = {}
-
 # Initialize Supabase client
 supabase: Client = create_client(
     os.getenv('SUPABASE_URL'),
@@ -53,83 +52,170 @@ supabase: Client = create_client(
 )
 logger.info(f"Supabase initialized with URL: {os.getenv('SUPABASE_URL')}")
 
-def init_modal():
-    global modal_function, modal_initialized
-    try:
-        logger.info("=== Starting Modal Initialization ===")
-        modal_function = modal.Function.lookup("just-call-bud-prod", "get_llama_response")
-        if modal_function:
-            modal_initialized = True
-            logger.info("Modal function found and initialized successfully")
-    except Exception as e:
-        logger.error(f"Modal initialization error: {str(e)}")
-        logger.error(f"Full error details: {repr(e)}")
+# Initialize LangChain components
+SYSTEM_PROMPT = """You are Bud, a friendly and knowledgeable AI handyman assistant. 
+Core rules:
+1. Never use asterisks (*) or describe actions
+2. Never use emotes or roleplay elements
+3. Maintain a professional, direct tone
+4. Focus only on home repair advice
+5. Start responses with "Hello" or direct answers
+6. Avoid casual expressions or emojis
 
-# Force initialization at startup
-logger.info("=== Forcing Modal Initialization ===")
+Your purpose is to provide practical, safety-focused home maintenance advice.
+Keep all responses focused on technical details and solutions."""
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", SYSTEM_PROMPT),
+    MessagesPlaceholder(variable_name="history"),
+    ("human", "{input}")
+])
+
+# Initialize LLM based on environment
 if USE_MODAL:
-    init_modal()
+    llm = ChatOpenAI()  # Will need to be replaced with Modal's function
 else:
-    logger.info("Development mode - skipping Modal initialization")
+    llm = ChatOllama(model="llama2")
+
+def get_or_create_anonymous_user():
+    """Get existing or create new anonymous user session"""
+    if 'user_id' not in session:
+        try:
+            # Generate a more standard anonymous email format
+            random_id = str(uuid.uuid4())[:8]  # Use first 8 chars of UUID
+            anonymous_email = f"anonymous.{random_id}@justcallbud.com"
+            
+            # Sign up anonymously with Supabase
+            auth_response = supabase.auth.sign_up({
+                "email": anonymous_email,
+                "password": uuid.uuid4().hex
+            })
+            session['user_id'] = auth_response.user.id
+        except Exception as e:
+            logger.error(f"Error creating anonymous user: {str(e)}")
+            raise
+    return session['user_id']
+
+def create_new_conversation(user_id):
+    """Create a new conversation in Supabase"""
+    try:
+        # Create conversation with only required fields
+        result = supabase.table('conversations').insert({
+            'user_id': user_id,
+            'created_at': datetime.now().isoformat()
+        }).execute()
+        conversation = result.data[0]
+        session['conversation_id'] = conversation['id']
+        logger.info(f"Created new conversation: {conversation['id']}")
+        return conversation['id']
+    except Exception as e:
+        logger.error(f"Error creating conversation: {str(e)}")
+        raise
+
+def get_or_create_conversation():
+    """Get existing or create new conversation"""
+    user_id = get_or_create_anonymous_user()
+    # Always create a new conversation
+    return create_new_conversation(user_id)
+
+def get_conversation_history(conversation_id):
+    """Get conversation history from Supabase and format for LangChain"""
+    messages = supabase.table('messages') \
+        .select('*') \
+        .eq('conversation_id', conversation_id) \
+        .order('message_number', desc=False) \
+        .execute()
+    
+    history = []
+    for msg in messages.data:
+        if msg['is_user']:
+            history.append(HumanMessage(content=msg['content']))
+        else:
+            history.append(AIMessage(content=msg['content']))
+    
+    return history
 
 @app.route('/')
 def home():
+    # Clear the conversation_id from session to force a new conversation on page load
+    if 'conversation_id' in session:
+        del session['conversation_id']
     return render_template('index.html')
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:
-        if not USE_MODAL:
-            # Use Ollama in development
-            prompt = request.form.get('content', '')
-            formatted_prompt = f"""<s>[INST] <<SYS>>
-                You are Bud, a friendly and knowledgeable AI handyman assistant. 
-                Core rules:
-                1. Never use asterisks (*) or describe actions
-                2. Never use emotes or roleplay elements
-                3. Maintain a professional, direct tone
-                4. Focus only on home repair advice
-                5. Start responses with "Hello" or direct answers
-                6. Avoid casual expressions or emojis
-                
-                Your purpose is to provide practical, safety-focused home maintenance advice.
-                Keep all responses focused on technical details and solutions.
-                <</SYS>>
-                
-                {prompt} [/INST]"""
+        # Ensure we have a valid conversation
+        conversation_id = get_or_create_conversation()
+        
+        prompt_text = request.form.get('content', '')
+        if not prompt_text:
+            raise ValueError("Message content cannot be empty")
             
-            response = requests.post('http://localhost:11434/api/generate',
-                json={
-                    "model": "llama2",
-                    "prompt": formatted_prompt,
-                    "stream": False
-                }
-            ).json()
-            
-            response_text = response.get('response', '')
-            
-            return jsonify({
-                "content": response_text,
-                "isUser": False,
-                "timestamp": datetime.now().isoformat()
+        logger.info(f"Received prompt: {prompt_text}")
+        
+        # Get conversation history
+        history = get_conversation_history(conversation_id)
+        
+        # Get response using LangChain
+        if USE_MODAL:
+            response_text = modal_function.remote(prompt_text)
+        else:
+            # Create the chain properly
+            chain = prompt | llm
+            response = chain.invoke({
+                "history": history,
+                "input": prompt_text
             })
+            response_text = response.content
+
+        if not response_text:
+            raise ValueError("Empty response from AI model")
+
+        # Get the current max message number for this conversation
+        result = supabase.table('messages') \
+            .select('message_number') \
+            .eq('conversation_id', conversation_id) \
+            .order('message_number', desc=True) \
+            .limit(1) \
+            .execute()
         
-        conversation_id = session.get('conversation_id')
-        if not conversation_id:
-            conversation_id = str(uuid.uuid4())
-            session['conversation_id'] = conversation_id
-            conversation_store[conversation_id] = []
-        
-        prompt = request.form.get('content', '')
-        logger.info(f"Received prompt: {prompt}")
-        
-        response = modal_function.remote(prompt)
-        
+        current_max_number = 0
+        if result.data:
+            current_max_number = result.data[0].get('message_number', 0)
+
+        # Store user message
+        message_data = {
+            'content': prompt_text,
+            'is_user': True,
+            'conversation_id': conversation_id,
+            'message_number': current_max_number + 1,
+            'created_at': datetime.now().isoformat()
+        }
+        supabase.table('messages').insert(message_data).execute()
+
+        # Store bot response
+        bot_message_data = {
+            'content': response_text,
+            'is_user': False,
+            'conversation_id': conversation_id,
+            'message_number': current_max_number + 2,
+            'created_at': datetime.now().isoformat()
+        }
+        supabase.table('messages').insert(bot_message_data).execute()
+            
         return jsonify({
-            "content": response,
+            "content": response_text,
             "isUser": False,
             "timestamp": datetime.now().isoformat()
         })
+    except ValueError as e:
+        logger.error(f"Validation error: {str(e)}")
+        return jsonify({
+            "content": f"Error: {str(e)}",
+            "isUser": False,
+            "timestamp": datetime.now().isoformat()
+        }), 400
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
         logger.error(f"Full error details: {repr(e)}")
@@ -150,11 +236,32 @@ def test():
 
 @app.route('/api/messages', methods=['GET'])
 def get_messages():
-    return jsonify([])  # Return empty array for now
+    try:
+        conversation_id = get_or_create_conversation()
+        messages = supabase.table('messages') \
+            .select('*') \
+            .eq('conversation_id', conversation_id) \
+            .order('message_number', desc=False) \
+            .execute()
+        return jsonify([{
+            'content': msg['content'],
+            'isUser': msg['is_user'],
+            'timestamp': msg['created_at']
+        } for msg in messages.data])
+    except Exception as e:
+        logger.error(f"Error getting messages: {str(e)}")
+        return jsonify([])
 
 @app.route('/api/messages', methods=['DELETE'])
 def clear_messages():
-    return jsonify({'status': 'success'})
+    try:
+        # Create new conversation
+        user_id = get_or_create_anonymous_user()
+        create_new_conversation(user_id)
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        logger.error(f"Error clearing messages: {str(e)}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/health')
 def health():
