@@ -133,13 +133,17 @@ class LLM:
 async def chat(prompt_text: str, history=None) -> str:
     logger.info("Chat function called")
     try:
+        logger.info("About to create LLM instance...")
         llm = LLM()
-        logger.info("LLM instance created")
+        logger.info("LLM instance created successfully")
+        logger.info(f"Generating response for prompt: {prompt_text[:50]}...")  # Log first 50 chars of prompt
         response = await llm.generate(prompt_text, history)
         logger.info("Response generated successfully")
         return response
     except Exception as e:
         logger.error(f"Error in chat function: {str(e)}")
+        logger.error(f"Full error details: {repr(e)}")
+        logger.error("Stack trace:", exc_info=True)
         raise
 
 if __name__ == "__main__":
