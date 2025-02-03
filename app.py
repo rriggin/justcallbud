@@ -31,11 +31,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Initialize Flask app with secret key first
+app = Flask(__name__)
+
+# Get the secret key with detailed logging
+secret_key = os.getenv('FLASK_SECRET_KEY')
+if secret_key:
+    logger.info("Found FLASK_SECRET_KEY in environment")
+    app.secret_key = secret_key
+else:
+    logger.warning("No FLASK_SECRET_KEY found in environment, using development key")
+    app.secret_key = 'dev-only-secret-key-do-not-use-in-production'
+
+logger.info(f"Flask app initialized with secret key length: {len(str(app.secret_key))}")
+logger.info(f"First few characters of secret key: {str(app.secret_key)[:8]}...")
+
 # Log environment for debugging
 logger.info(f"FLASK_ENV: {os.getenv('FLASK_ENV')}")
-
-app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY')
 
 # Use Modal unless explicitly in development
 USE_MODAL = os.getenv('FLASK_ENV') != 'development'
