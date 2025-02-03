@@ -27,7 +27,7 @@ jobs:
           
       - name: Test deployment
         run: |
-          python -m modal run modal_functions.py::test_function
+          python -m modal run modal_functions.py::test_deployment
           
       - name: Deploy to Render
         env:
