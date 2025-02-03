@@ -50,7 +50,7 @@ class LLM:
         self.model = None
         self.pipeline = None
 
-    def __enter__(self):
+    async def __aenter__(self):
         self.tokenizer = AutoTokenizer.from_pretrained(
             "meta-llama/Llama-2-7b-chat-hf",
             torch_dtype=torch.float16
@@ -71,7 +71,7 @@ class LLM:
         )
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
         # Clean up resources if needed
         self.model = None
         self.tokenizer = None
