@@ -19,7 +19,6 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain.memory import ConversationBufferMemory
 from langchain_community.chat_models import ChatOllama
-from langchain_openai import ChatOpenAI
 
 # Load environment variables from .env
 load_dotenv()
@@ -76,9 +75,19 @@ prompt = ChatPromptTemplate.from_messages([
 
 # Initialize LLM based on environment
 if USE_MODAL:
-    llm = ChatOpenAI()  # Will need to be replaced with Modal's function
+    # In production, we use the Modal function directly
+    try:
+        from modal_functions import chat
+        modal_function = chat
+        modal_initialized = True
+        logger.info("Modal function initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing Modal function: {str(e)}")
+        modal_initialized = False
 else:
+    # In development, use local Ollama
     llm = ChatOllama(model="llama2")
+    logger.info("Local Ollama initialized for development")
 
 # Initialize Redis client
 redis_client = Redis(host='localhost', port=6379, db=0, decode_responses=True)
@@ -215,7 +224,8 @@ def chat():
             collected_response = []
             
             if USE_MODAL:
-                response_text = modal_function.remote(prompt_text)
+                # Pass both prompt and history to Modal function
+                response_text = modal_function.remote(prompt_text, history)
                 yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
                 collected_response = [response_text]
             else:
