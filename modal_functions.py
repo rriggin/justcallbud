@@ -1,6 +1,7 @@
 import modal
 from modal import App, Image, Secret
 import datetime
+from datetime import timezone
 
 def create_image():
     return modal.Image.debian_slim().pip_install("requests")
@@ -13,7 +14,7 @@ app = modal.App("just-call-bud-prod")
     secrets=[modal.Secret.from_name("just_call_bud_secrets")]
 )
 async def test_deployment():
-    timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
+    timestamp = datetime.datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     return f"Deployment test successful at {timestamp}"
 
 if __name__ == "__main__":
