@@ -46,11 +46,6 @@ app = modal.App("just-call-bud-prod")
 )
 class LLM:
     def __init__(self):
-        self.tokenizer = None
-        self.model = None
-        self.pipeline = None
-
-    async def __aenter__(self):
         self.tokenizer = AutoTokenizer.from_pretrained(
             "meta-llama/Llama-2-7b-chat-hf",
             torch_dtype=torch.float16
@@ -69,13 +64,6 @@ class LLM:
             top_p=0.95,
             repetition_penalty=1.15
         )
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        # Clean up resources if needed
-        self.model = None
-        self.tokenizer = None
-        self.pipeline = None
 
     async def generate(self, prompt_text: str, history=None) -> str:
         if history is None:
@@ -103,9 +91,9 @@ class LLM:
     secrets=[modal.Secret.from_name("just_call_bud_secrets")]
 )
 async def chat(prompt_text: str, history=None) -> str:
-    async with LLM() as llm:
-        response = await llm.generate(prompt_text, history)
-        return response
+    llm = LLM()
+    response = await llm.generate(prompt_text, history)
+    return response
 
 if __name__ == "__main__":
     print("=== Testing Modal Deployment ===")
