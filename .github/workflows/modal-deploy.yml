@@ -28,7 +28,7 @@ jobs:
           
       - name: Test deployment
         run: |
-          python -m modal run modal_functions.py::chat "How do I fix a leaky faucet?"
+          python -m modal run modal_functions.py::chat --prompt-text "How do I fix a leaky faucet?"
           
       - name: Deploy to Render
         env:
