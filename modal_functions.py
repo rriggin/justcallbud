@@ -51,9 +51,8 @@ app = modal.App("just-call-bud-prod")
 @app.cls(
     image=create_image(),
     gpu="A10G",
-    timeout=600,  # Increased timeout to 10 minutes
-    secrets=[modal.Secret.from_name("huggingface-secret")],
-    container_idle_timeout=300  # Keep container alive for 5 minutes
+    timeout=600,  # 10 minutes timeout
+    secrets=[modal.Secret.from_name("huggingface-secret")]
 )
 class LLM:
     def __init__(self):
@@ -78,9 +77,8 @@ class LLM:
             logger.info("Loading model...")
             self.model = AutoModelForCausalLM.from_pretrained(
                 "meta-llama/Llama-2-7b-chat-hf",
-                torch_dtype=torch.float16,  # Always use float16 with GPU
+                torch_dtype=torch.float16,
                 device_map="auto",
-                low_cpu_mem_usage=True,
                 token=hf_token
             )
             logger.info("Model loaded successfully")
@@ -99,23 +97,6 @@ class LLM:
         except Exception as e:
             logger.error(f"Error during initialization: {str(e)}")
             raise
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        # Clean up resources if needed
-        logger.info("Cleaning up LLM resources...")
-        try:
-            del self.pipeline
-            del self.model
-            del self.tokenizer
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            logger.info("Resources cleaned up successfully")
-        except Exception as e:
-            logger.error(f"Error during cleanup: {str(e)}")
-        return None  # Re-raise any exceptions
 
     async def generate(self, prompt_text: str, history=None) -> str:
         try:
@@ -146,20 +127,20 @@ class LLM:
 
 @app.function(
     image=create_image(),
-    gpu="A10G",  # Ensure GPU for chat function too
-    timeout=600,  # Match the class timeout
+    gpu="A10G",
+    timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
 async def chat(prompt_text: str, history=None) -> str:
     logger.info("Chat function called")
     try:
-        logger.info("About to create LLM instance...")
-        with LLM() as llm:
-            logger.info("LLM instance created successfully")
-            logger.info(f"Generating response for prompt: {prompt_text[:50]}...")
-            response = await llm.generate(prompt_text, history)
-            logger.info("Response generated successfully")
-            return response
+        logger.info("Creating LLM instance...")
+        llm = LLM()
+        logger.info("LLM instance created")
+        logger.info(f"Generating response for prompt: {prompt_text[:50]}...")
+        response = await llm.generate(prompt_text, history)
+        logger.info("Response generated successfully")
+        return response
     except Exception as e:
         logger.error(f"Error in chat function: {str(e)}")
         logger.error(f"Full error details: {repr(e)}")
