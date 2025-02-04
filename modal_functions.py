@@ -47,8 +47,9 @@ prompt = ChatPromptTemplate.from_messages([
 ])
 
 app = modal.App("just-call-bud-prod")
+stub = modal.Stub("just-call-bud-prod")
 
-@app.cls(
+@stub.cls(
     image=create_image(),
     gpu="A10G",
     timeout=600,  # 10 minutes timeout
@@ -125,12 +126,13 @@ class LLM:
             logger.error(f"Error during generation: {str(e)}")
             raise
 
-@app.function(
+@stub.function(
     image=create_image(),
     gpu="A10G",
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
+@modal.web_endpoint()
 async def chat(prompt_text: str, history=None) -> str:
     logger.info("Chat function called")
     try:
@@ -148,11 +150,4 @@ async def chat(prompt_text: str, history=None) -> str:
         raise
 
 if __name__ == "__main__":
-    print("=== Testing Modal Deployment ===")
-    with app.run():
-        try:
-            response = chat.remote("How do I fix a leaky faucet?")
-            print(f"Success! Response: {response}")
-        except Exception as e:
-            print(f"Error: {str(e)}")
-            raise 
+    stub.serve() 
