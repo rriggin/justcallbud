@@ -19,9 +19,9 @@ langchain-openai>=0.0.5
 
 # Machine Learning packages
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.1.0+cpu
+torch==2.1.2
 transformers==4.37.2
-accelerate>=0.26.1
+accelerate==0.26.1
 safetensors>=0.4.1
 einops>=0.7.0
 
