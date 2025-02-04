@@ -28,7 +28,10 @@ jobs:
           
       - name: Test deployment
         run: |
-          python -m modal run modal_functions.py::chat --prompt-text "How do I fix a leaky faucet?"
+          sleep 10  # Wait for deployment to be ready
+          curl -X POST https://rriggin--just-call-bud-prod--chat-prod.modal.run \
+            -H "Content-Type: application/json" \
+            -d '{"prompt_text": "How do I fix a leaky faucet?", "history": []}'
           
       - name: Deploy to Render
         env:
