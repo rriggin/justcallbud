@@ -51,14 +51,15 @@ logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 # Initialize Modal globally
 modal_function = None
 modal_initialized = False
+pending_jobs = {}
 
 # Initialize Modal function
 if USE_MODAL:
     try:
         logger.info("Initializing Modal client...")
-        modal_function = "https://rriggin--just-call-bud-prod--chat.modal.run/chat"  # Production Modal endpoint URL with path
+        modal_function = modal.Function.from_name("just-call-bud-prod", "chat")
         modal_initialized = True
-        logger.info("Modal endpoint URL set successfully")
+        logger.info("Modal function initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing Modal client: {str(e)}")
         logger.error("Full error details:", exc_info=True)
@@ -264,19 +265,23 @@ def chat():
             if USE_MODAL:
                 try:
                     if not modal_initialized or not modal_function:
-                        raise RuntimeError("Modal endpoint URL not properly initialized. Please check server logs.")
+                        raise RuntimeError("Modal function not properly initialized. Please check server logs.")
                         
-                    logger.info("Calling Modal endpoint...")
-                    response = requests.post(
-                        modal_function,
-                        json={
+                    logger.info("Spawning Modal function call...")
+                    job_id = str(uuid.uuid4())
+                    function_call = modal_function.spawn(
+                        job_id=job_id,
+                        params={
                             "prompt_text": prompt_text,
                             "history": [{"content": msg.content, "type": "human" if isinstance(msg, HumanMessage) else "ai"} for msg in history]
                         }
                     )
-                    response.raise_for_status()
-                    response_text = response.text
-                    logger.info("Modal endpoint call successful")
+                    pending_jobs[job_id] = function_call
+                    
+                    # Wait for result
+                    logger.info(f"Waiting for Modal function result (job_id: {job_id})...")
+                    response_text = function_call.get()
+                    logger.info("Modal function call completed")
                     yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
                     collected_response = [response_text]
                 except Exception as e:

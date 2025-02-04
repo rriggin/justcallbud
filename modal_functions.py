@@ -132,13 +132,12 @@ class LLM:
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
-@web_endpoint()
-def chat(data: dict) -> str:
+def chat(params: dict) -> str:
     logger.info("Chat function called")
     try:
         # Get data from request
-        prompt_text = data.get("prompt_text", "")
-        raw_history = data.get("history", [])
+        prompt_text = params.get("prompt_text", "")
+        raw_history = params.get("history", [])
         
         # Convert history format
         history = []
