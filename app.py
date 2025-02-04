@@ -51,12 +51,15 @@ logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 # Initialize Modal globally
 modal_function = None
 modal_initialized = False
+modal_app = None
 
 # Initialize Modal function
 try:
     if USE_MODAL:
         logger.info("Attempting to initialize Modal function...")
-        from modal_functions import chat
+        from modal_functions import app as modal_app, chat
+        logger.info("Starting Modal app...")
+        modal_app.run()  # Start the Modal app
         modal_function = chat
         modal_initialized = True
         logger.info("Modal function initialized successfully")
@@ -277,6 +280,9 @@ def chat():
                 try:
                     # Pass both prompt and history to Modal function
                     logger.info("Calling Modal function...")
+                    if not modal_app or not modal_app.is_running():
+                        logger.info("Modal app not running, starting it...")
+                        modal_app.run()
                     response_text = modal_function.remote(prompt_text, history)
                     logger.info("Modal function call successful")
                     yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
