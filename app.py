@@ -103,16 +103,23 @@ else:
 # Initialize Redis client (optional)
 try:
     redis_url = os.getenv('REDIS_URL')  # Render provides this environment variable
-    if redis_url:
-        # Parse Redis URL and initialize client
+    if redis_url and USE_MODAL:  # In production
         redis_client = Redis.from_url(redis_url, decode_responses=True)
         redis_enabled = True
-        logger.info("Redis cache initialized using REDIS_URL")
+        logger.info("Redis cache initialized using REDIS_URL in production")
+    elif not USE_MODAL:  # In development
+        try:
+            redis_client = Redis(host='localhost', port=6379, db=0, decode_responses=True)
+            redis_enabled = True
+            logger.info("Redis cache initialized using localhost for development")
+        except Exception as e:
+            logger.warning(f"Local Redis not available in development: {str(e)}")
+            redis_client = None
+            redis_enabled = False
     else:
-        # Local development fallback
-        redis_client = Redis(host='localhost', port=6379, db=0, decode_responses=True)
-        redis_enabled = True
-        logger.info("Redis cache initialized using localhost")
+        logger.warning("Redis URL not found in production environment")
+        redis_client = None
+        redis_enabled = False
 except Exception as e:
     redis_client = None
     redis_enabled = False
