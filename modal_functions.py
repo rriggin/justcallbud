@@ -132,8 +132,8 @@ class LLM:
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
-def chat(params: dict) -> str:
-    logger.info("Chat function called")
+def chat(params: dict, job_id: str = None) -> str:
+    logger.info(f"Chat function called with job_id: {job_id}")
     try:
         # Get data from request
         prompt_text = params.get("prompt_text", "")
