@@ -138,7 +138,17 @@ def chat(data: dict) -> str:
     try:
         # Get data from request
         prompt_text = data.get("prompt_text", "")
-        history = data.get("history", None)
+        raw_history = data.get("history", [])
+        
+        # Convert history format
+        history = []
+        for msg in raw_history:
+            content = msg.get("content", "")
+            msg_type = msg.get("type", "human")
+            if msg_type == "human":
+                history.append(HumanMessage(content=content))
+            else:
+                history.append(AIMessage(content=content))
         
         logger.info("Creating LLM instance...")
         llm = LLM()
