@@ -56,7 +56,7 @@ app = modal.App("just-call-bud-prod")
     container_idle_timeout=300  # Keep container alive for 5 minutes
 )
 class LLM:
-    def __enter__(self):
+    def __init__(self):
         logger.info("Initializing LLM class...")
         try:
             # Get Hugging Face token from environment
@@ -96,10 +96,26 @@ class LLM:
                 repetition_penalty=1.15
             )
             logger.info("Pipeline setup complete")
-            return self
         except Exception as e:
             logger.error(f"Error during initialization: {str(e)}")
             raise
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Clean up resources if needed
+        logger.info("Cleaning up LLM resources...")
+        try:
+            del self.pipeline
+            del self.model
+            del self.tokenizer
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            logger.info("Resources cleaned up successfully")
+        except Exception as e:
+            logger.error(f"Error during cleanup: {str(e)}")
+        return None  # Re-raise any exceptions
 
     async def generate(self, prompt_text: str, history=None) -> str:
         try:
