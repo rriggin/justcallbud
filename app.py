@@ -51,30 +51,23 @@ logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 # Initialize Modal globally
 modal_function = None
 modal_initialized = False
-modal_app = None
 
 # Initialize Modal function
-try:
-    if USE_MODAL:
-        logger.info("Attempting to initialize Modal function...")
+if USE_MODAL:
+    try:
+        logger.info("Initializing Modal...")
         from modal_functions import app as modal_app, chat
-        logger.info("Starting Modal app...")
-        modal_app.run()  # Start the Modal app
+        modal_app.run()
         modal_function = chat
         modal_initialized = True
-        logger.info("Modal function initialized successfully")
-        logger.info("Modal token environment variables:")
-        logger.info(f"MODAL_TOKEN_ID exists: {bool(os.getenv('MODAL_TOKEN_ID'))}")
-        logger.info(f"MODAL_TOKEN_SECRET exists: {bool(os.getenv('MODAL_TOKEN_SECRET'))}")
-    else:
-        logger.info("Running in development mode, using local Ollama")
-        llm = ChatOllama(model="llama2")
-        logger.info("Local Ollama initialized for development")
-except Exception as e:
-    logger.error(f"Error initializing Modal function: {str(e)}")
-    logger.error("Full error details:", exc_info=True)
-    modal_initialized = False
-    modal_function = None
+        logger.info("Modal initialized successfully")
+    except Exception as e:
+        logger.error(f"Error initializing Modal: {str(e)}")
+        logger.error("Full error details:", exc_info=True)
+else:
+    logger.info("Running in development mode, using local Ollama")
+    llm = ChatOllama(model="llama2")
+    logger.info("Local Ollama initialized for development")
 
 # Initialize Supabase client based on environment
 if USE_MODAL:  # Production
@@ -267,46 +260,20 @@ def chat():
         supabase.table('messages').insert(message_data).execute()
 
         def generate():
+            global modal_initialized, modal_function
             collected_response = []
             
             if USE_MODAL:
                 try:
-                    # Pass both prompt and history to Modal function
                     logger.info("Calling Modal function...")
-                    try:
-                        # Ensure Modal is initialized
-                        if not modal_initialized:
-                            logger.info("Modal not initialized, initializing...")
-                            from modal_functions import app as modal_app, chat
-                            modal_app.run()
-                            global modal_function
-                            modal_function = chat
-                            global modal_initialized
-                            modal_initialized = True
-                            logger.info("Modal initialized successfully")
-                        
-                        # Call the Modal function
-                        response_text = modal_function.remote(prompt_text, history)
-                        logger.info("Modal function call successful")
-                        yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
-                        collected_response = [response_text]
-                    except ImportError as ie:
-                        error_msg = f"Failed to import Modal functions: {str(ie)}"
-                        logger.error(error_msg)
-                        yield f"data: {json.dumps({'content': error_msg, 'done': False})}\n\n"
-                        yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
-                        return
-                    except Exception as e:
-                        error_msg = f"Error during Modal operation: {str(e)}"
-                        logger.error(error_msg)
-                        logger.error("Full error details:", exc_info=True)
-                        yield f"data: {json.dumps({'content': error_msg, 'done': False})}\n\n"
-                        yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
-                        return
-                except Exception as outer_e:
-                    error_msg = f"Outer error in Modal handling: {str(outer_e)}"
+                    response_text = modal_function.remote(prompt_text, history)
+                    logger.info("Modal function call successful")
+                    yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
+                    collected_response = [response_text]
+                except Exception as e:
+                    error_msg = f"Error in Modal operation: {str(e)}"
                     logger.error(error_msg)
-                    logger.error("Full outer error details:", exc_info=True)
+                    logger.error("Full error details:", exc_info=True)
                     yield f"data: {json.dumps({'content': error_msg, 'done': False})}\n\n"
                     yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
                     return
