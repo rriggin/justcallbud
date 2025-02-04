@@ -132,12 +132,12 @@ class LLM:
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
-def chat(params: dict, job_id: str = None) -> str:
-    logger.info(f"Chat function called with job_id: {job_id}")
+def chat(data: dict) -> str:
+    logger.info("Chat function called")
     try:
         # Get data from request
-        prompt_text = params.get("prompt_text", "")
-        raw_history = params.get("history", [])
+        prompt_text = data.get("prompt_text", "")
+        raw_history = data.get("history", [])
         
         # Convert history format
         history = []

@@ -267,20 +267,11 @@ def chat():
                     if not modal_initialized or not modal_function:
                         raise RuntimeError("Modal function not properly initialized. Please check server logs.")
                         
-                    logger.info("Spawning Modal function call...")
-                    job_id = str(uuid.uuid4())
-                    function_call = modal_function.spawn(
-                        job_id=job_id,
-                        params={
-                            "prompt_text": prompt_text,
-                            "history": [{"content": msg.content, "type": "human" if isinstance(msg, HumanMessage) else "ai"} for msg in history]
-                        }
-                    )
-                    pending_jobs[job_id] = function_call
-                    
-                    # Wait for result
-                    logger.info(f"Waiting for Modal function result (job_id: {job_id})...")
-                    response_text = function_call.get()
+                    logger.info("Calling Modal function...")
+                    response_text = modal_function.remote({
+                        "prompt_text": prompt_text,
+                        "history": [{"content": msg.content, "type": "human" if isinstance(msg, HumanMessage) else "ai"} for msg in history]
+                    })
                     logger.info("Modal function call completed")
                     yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
                     collected_response = [response_text]
