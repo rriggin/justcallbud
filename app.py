@@ -60,8 +60,13 @@ try:
         modal_function = chat
         modal_initialized = True
         logger.info("Modal function initialized successfully")
+        logger.info("Modal token environment variables:")
+        logger.info(f"MODAL_TOKEN_ID exists: {bool(os.getenv('MODAL_TOKEN_ID'))}")
+        logger.info(f"MODAL_TOKEN_SECRET exists: {bool(os.getenv('MODAL_TOKEN_SECRET'))}")
     else:
         logger.info("Running in development mode, using local Ollama")
+        llm = ChatOllama(model="llama2")
+        logger.info("Local Ollama initialized for development")
 except Exception as e:
     logger.error(f"Error initializing Modal function: {str(e)}")
     logger.error("Full error details:", exc_info=True)
@@ -99,22 +104,6 @@ prompt = ChatPromptTemplate.from_messages([
     MessagesPlaceholder(variable_name="history"),
     ("human", "{input}")
 ])
-
-# Initialize LLM based on environment
-if USE_MODAL:
-    # In production, we use the Modal function directly
-    try:
-        from modal_functions import chat
-        modal_function = chat
-        modal_initialized = True
-        logger.info("Modal function initialized successfully")
-    except Exception as e:
-        logger.error(f"Error initializing Modal function: {str(e)}")
-        modal_initialized = False
-else:
-    # In development, use local Ollama
-    llm = ChatOllama(model="llama2")
-    logger.info("Local Ollama initialized for development")
 
 # Initialize Redis client (optional)
 try:
@@ -278,10 +267,27 @@ def chat():
             collected_response = []
             
             if USE_MODAL:
-                # Pass both prompt and history to Modal function
-                response_text = modal_function.remote(prompt_text, history)
-                yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
-                collected_response = [response_text]
+                if not modal_initialized or not modal_function:
+                    error_msg = "Modal is not properly initialized. Please try again later."
+                    logger.error(error_msg)
+                    yield f"data: {json.dumps({'content': error_msg, 'done': False})}\n\n"
+                    yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
+                    return
+
+                try:
+                    # Pass both prompt and history to Modal function
+                    logger.info("Calling Modal function...")
+                    response_text = modal_function.remote(prompt_text, history)
+                    logger.info("Modal function call successful")
+                    yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
+                    collected_response = [response_text]
+                except Exception as e:
+                    error_msg = f"Error calling Modal function: {str(e)}"
+                    logger.error(error_msg)
+                    logger.error("Full error details:", exc_info=True)
+                    yield f"data: {json.dumps({'content': error_msg, 'done': False})}\n\n"
+                    yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
+                    return
             else:
                 # Create the chain properly
                 chain = prompt | llm
