@@ -270,39 +270,43 @@ def chat():
             collected_response = []
             
             if USE_MODAL:
-                if not modal_initialized or not modal_function:
-                    error_msg = "Modal is not properly initialized. Please try again later."
-                    logger.error(error_msg)
-                    yield f"data: {json.dumps({'content': error_msg, 'done': False})}\n\n"
-                    yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
-                    return
-
                 try:
                     # Pass both prompt and history to Modal function
                     logger.info("Calling Modal function...")
-                    if not modal_initialized or not modal_function:
-                        logger.info("Modal not initialized, attempting to initialize...")
-                        try:
+                    try:
+                        # Ensure Modal is initialized
+                        if not modal_initialized:
+                            logger.info("Modal not initialized, initializing...")
                             from modal_functions import app as modal_app, chat
                             modal_app.run()
+                            global modal_function
                             modal_function = chat
+                            global modal_initialized
                             modal_initialized = True
-                            logger.info("Modal reinitialized successfully")
-                        except Exception as e:
-                            error_msg = f"Failed to reinitialize Modal: {str(e)}"
-                            logger.error(error_msg)
-                            yield f"data: {json.dumps({'content': error_msg, 'done': False})}\n\n"
-                            yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
-                            return
-
-                    response_text = modal_function.remote(prompt_text, history)
-                    logger.info("Modal function call successful")
-                    yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
-                    collected_response = [response_text]
-                except Exception as e:
-                    error_msg = f"Error calling Modal function: {str(e)}"
+                            logger.info("Modal initialized successfully")
+                        
+                        # Call the Modal function
+                        response_text = modal_function.remote(prompt_text, history)
+                        logger.info("Modal function call successful")
+                        yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
+                        collected_response = [response_text]
+                    except ImportError as ie:
+                        error_msg = f"Failed to import Modal functions: {str(ie)}"
+                        logger.error(error_msg)
+                        yield f"data: {json.dumps({'content': error_msg, 'done': False})}\n\n"
+                        yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
+                        return
+                    except Exception as e:
+                        error_msg = f"Error during Modal operation: {str(e)}"
+                        logger.error(error_msg)
+                        logger.error("Full error details:", exc_info=True)
+                        yield f"data: {json.dumps({'content': error_msg, 'done': False})}\n\n"
+                        yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
+                        return
+                except Exception as outer_e:
+                    error_msg = f"Outer error in Modal handling: {str(outer_e)}"
                     logger.error(error_msg)
-                    logger.error("Full error details:", exc_info=True)
+                    logger.error("Full outer error details:", exc_info=True)
                     yield f"data: {json.dumps({'content': error_msg, 'done': False})}\n\n"
                     yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
                     return
