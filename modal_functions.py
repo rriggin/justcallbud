@@ -51,7 +51,7 @@ app = modal.App("just-call-bud-prod")
 @app.cls(
     image=create_image(),
     gpu="A10G",
-    timeout=60,
+    timeout=120,  # Increased timeout for model loading
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
 class LLM:
@@ -67,10 +67,14 @@ class LLM:
             login(token=hf_token)
             logger.info("Successfully logged in to Hugging Face")
             
+            # Determine if GPU is available
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            dtype = torch.float16 if device == "cuda" else torch.float32
+            logger.info(f"Using device: {device}, dtype: {dtype}")
+            
             logger.info("Loading tokenizer...")
             self.tokenizer = AutoTokenizer.from_pretrained(
                 "meta-llama/Llama-2-7b-chat-hf",
-                torch_dtype=torch.float16,
                 token=hf_token
             )
             logger.info("Tokenizer loaded successfully")
@@ -78,7 +82,7 @@ class LLM:
             logger.info("Loading model...")
             self.model = AutoModelForCausalLM.from_pretrained(
                 "meta-llama/Llama-2-7b-chat-hf",
-                torch_dtype=torch.float16,
+                torch_dtype=dtype,
                 device_map="auto",
                 token=hf_token
             )
@@ -92,7 +96,8 @@ class LLM:
                 max_new_tokens=500,
                 temperature=0.7,
                 top_p=0.95,
-                repetition_penalty=1.15
+                repetition_penalty=1.15,
+                device=device
             )
             logger.info("Pipeline setup complete")
         except Exception as e:
