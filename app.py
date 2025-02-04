@@ -270,7 +270,10 @@ def chat():
                         raise RuntimeError("Modal client not properly initialized. Please check server logs.")
                         
                     logger.info("Calling Modal function...")
-                    response_text = modal_function.remote(prompt_text, history)
+                    response_text = modal_function.remote({
+                        "prompt_text": prompt_text,
+                        "history": history
+                    })
                     logger.info("Modal function call successful")
                     yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
                     collected_response = [response_text]

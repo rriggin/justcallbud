@@ -131,9 +131,15 @@ class LLM:
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
-async def chat(prompt_text: str, history=None) -> str:
+@modal.web_endpoint(method="POST")
+async def chat(request: modal.Request) -> str:
     logger.info("Chat function called")
     try:
+        # Parse request data
+        data = await request.json()
+        prompt_text = data.get("prompt_text", "")
+        history = data.get("history", None)
+        
         logger.info("Creating LLM instance...")
         llm = LLM()
         logger.info("LLM instance created")
@@ -148,4 +154,4 @@ async def chat(prompt_text: str, history=None) -> str:
         raise
 
 if __name__ == "__main__":
-    app.run() 
+    modal.serve(app) 
