@@ -56,7 +56,7 @@ modal_initialized = False
 if USE_MODAL:
     try:
         logger.info("Initializing Modal client...")
-        modal_function = "https://rriggin--just-call-bud-prod--chat.modal.run"  # Production Modal endpoint URL
+        modal_function = "https://rriggin--just-call-bud-prod--chat.modal.run/chat"  # Production Modal endpoint URL with path
         modal_initialized = True
         logger.info("Modal endpoint URL set successfully")
     except Exception as e:

@@ -29,7 +29,7 @@ jobs:
       - name: Test deployment
         run: |
           sleep 10  # Wait for deployment to be ready
-          curl -X POST https://rriggin--just-call-bud-prod--chat.modal.run \
+          curl -X POST https://rriggin--just-call-bud-prod--chat.modal.run/chat \
             -H "Content-Type: application/json" \
             -d '{"prompt_text": "How do I fix a leaky faucet?", "history": []}'
           
