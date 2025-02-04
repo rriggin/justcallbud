@@ -8,7 +8,6 @@ import torch
 import logging
 import os
 from huggingface_hub import login
-from fastapi import Request
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -25,7 +24,8 @@ def create_image():
             "accelerate>=0.26.1",
             "huggingface-hub>=0.19.4",
             "einops>=0.7.0",
-            "safetensors>=0.4.1"
+            "safetensors>=0.4.1",
+            "fastapi[standard]>=0.109.0"
         ])
     )
 
@@ -132,12 +132,11 @@ class LLM:
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
-@web_endpoint(method="POST")
-async def chat(request: Request) -> str:
+@web_endpoint()
+def chat(data: dict) -> str:
     logger.info("Chat function called")
     try:
-        # Parse request data
-        data = await request.json()
+        # Get data from request
         prompt_text = data.get("prompt_text", "")
         history = data.get("history", None)
         
@@ -145,7 +144,7 @@ async def chat(request: Request) -> str:
         llm = LLM()
         logger.info("LLM instance created")
         logger.info(f"Generating response for prompt: {prompt_text[:50]}...")
-        response = await llm.generate(prompt_text, history)
+        response = llm.generate(prompt_text, history)
         logger.info("Response generated successfully")
         return response
     except Exception as e:
