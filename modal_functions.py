@@ -51,11 +51,12 @@ app = modal.App("just-call-bud-prod")
 @app.cls(
     image=create_image(),
     gpu="A10G",
-    timeout=120,  # Increased timeout for model loading
-    secrets=[modal.Secret.from_name("huggingface-secret")]
+    timeout=600,  # Increased timeout to 10 minutes
+    secrets=[modal.Secret.from_name("huggingface-secret")],
+    container_idle_timeout=300  # Keep container alive for 5 minutes
 )
 class LLM:
-    def __init__(self):
+    def __enter__(self):
         logger.info("Initializing LLM class...")
         try:
             # Get Hugging Face token from environment
@@ -67,11 +68,6 @@ class LLM:
             login(token=hf_token)
             logger.info("Successfully logged in to Hugging Face")
             
-            # Determine if GPU is available
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            dtype = torch.float16 if device == "cuda" else torch.float32
-            logger.info(f"Using device: {device}, dtype: {dtype}")
-            
             logger.info("Loading tokenizer...")
             self.tokenizer = AutoTokenizer.from_pretrained(
                 "meta-llama/Llama-2-7b-chat-hf",
@@ -82,8 +78,8 @@ class LLM:
             logger.info("Loading model...")
             self.model = AutoModelForCausalLM.from_pretrained(
                 "meta-llama/Llama-2-7b-chat-hf",
-                torch_dtype=dtype,
-                device_map="auto",  # Let accelerate handle device mapping
+                torch_dtype=torch.float16,  # Always use float16 with GPU
+                device_map="auto",
                 low_cpu_mem_usage=True,
                 token=hf_token
             )
@@ -100,6 +96,7 @@ class LLM:
                 repetition_penalty=1.15
             )
             logger.info("Pipeline setup complete")
+            return self
         except Exception as e:
             logger.error(f"Error during initialization: {str(e)}")
             raise
@@ -133,18 +130,20 @@ class LLM:
 
 @app.function(
     image=create_image(),
+    gpu="A10G",  # Ensure GPU for chat function too
+    timeout=600,  # Match the class timeout
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
 async def chat(prompt_text: str, history=None) -> str:
     logger.info("Chat function called")
     try:
         logger.info("About to create LLM instance...")
-        llm = LLM()
-        logger.info("LLM instance created successfully")
-        logger.info(f"Generating response for prompt: {prompt_text[:50]}...")  # Log first 50 chars of prompt
-        response = await llm.generate(prompt_text, history)
-        logger.info("Response generated successfully")
-        return response
+        with LLM() as llm:
+            logger.info("LLM instance created successfully")
+            logger.info(f"Generating response for prompt: {prompt_text[:50]}...")
+            response = await llm.generate(prompt_text, history)
+            logger.info("Response generated successfully")
+            return response
     except Exception as e:
         logger.error(f"Error in chat function: {str(e)}")
         logger.error(f"Full error details: {repr(e)}")
