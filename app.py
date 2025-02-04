@@ -56,15 +56,12 @@ modal_initialized = False
 if USE_MODAL:
     try:
         logger.info("Initializing Modal client...")
-        from modal_functions import chat
-        modal_function = chat
+        modal_function = modal.Function.from_name("just-call-bud-prod", "chat")
         modal_initialized = True
         logger.info("Modal client initialized successfully")
-        logger.info("Note: Make sure modal_functions.py is deployed using 'modal deploy modal_functions.py'")
     except Exception as e:
         logger.error(f"Error initializing Modal client: {str(e)}")
         logger.error("Full error details:", exc_info=True)
-        logger.error("Hint: Run 'modal deploy modal_functions.py' if not already deployed")
 else:
     logger.info("Running in development mode, using local Ollama")
     llm = ChatOllama(model="llama2")
