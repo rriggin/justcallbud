@@ -132,7 +132,7 @@ class LLM:
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
-def chat(data: dict) -> str:
+async def chat(data: dict) -> str:
     logger.info("Chat function called")
     try:
         # Get data from request
@@ -153,7 +153,7 @@ def chat(data: dict) -> str:
         llm = LLM()
         logger.info("LLM instance created")
         logger.info(f"Generating response for prompt: {prompt_text[:50]}...")
-        response = llm.generate(prompt_text, history)
+        response = await llm.generate(prompt_text, history)
         logger.info("Response generated successfully")
         return response
     except Exception as e:
