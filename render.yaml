@@ -2,7 +2,9 @@ services:
   - type: web
     name: justcallbud
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      pip install -r requirements.txt
+      python3 -m modal token set --token-id $MODAL_TOKEN_ID --token-secret $MODAL_TOKEN_SECRET
     startCommand: gunicorn app:app
     pythonVersion: 3.11.0
     envVars:
@@ -10,5 +12,11 @@ services:
         value: 3.11.0
       - key: PYTHONUNBUFFERED
         value: true
+      - key: MODAL_TOKEN_ID
+        sync: false
+      - key: MODAL_TOKEN_SECRET
+        sync: false
+      - key: FLASK_ENV
+        value: production
     autoDeploy: true
     healthCheckPath: /health

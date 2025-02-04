@@ -52,6 +52,22 @@ logger.info(f"Environment: {'Production' if USE_MODAL else 'Development'}")
 modal_function = None
 modal_initialized = False
 
+# Initialize Modal function
+try:
+    if USE_MODAL:
+        logger.info("Attempting to initialize Modal function...")
+        from modal_functions import chat
+        modal_function = chat
+        modal_initialized = True
+        logger.info("Modal function initialized successfully")
+    else:
+        logger.info("Running in development mode, using local Ollama")
+except Exception as e:
+    logger.error(f"Error initializing Modal function: {str(e)}")
+    logger.error("Full error details:", exc_info=True)
+    modal_initialized = False
+    modal_function = None
+
 # Initialize Supabase client based on environment
 if USE_MODAL:  # Production
     supabase_url = os.getenv('SUPABASE_URL')
