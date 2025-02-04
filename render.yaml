@@ -3,8 +3,18 @@ services:
     name: justcallbud
     env: python
     buildCommand: |
-      pip install -r requirements.txt
-      python3 -m modal token set --token-id $MODAL_TOKEN_ID --token-secret $MODAL_TOKEN_SECRET
+      echo "Starting build process..."
+      echo "Installing Python packages..."
+      pip install -r requirements.txt || { echo "Failed to install requirements"; exit 1; }
+      
+      echo "Setting up Modal token..."
+      if [ -z "$MODAL_TOKEN_ID" ] || [ -z "$MODAL_TOKEN_SECRET" ]; then
+        echo "Error: Modal tokens not set"
+        exit 1
+      fi
+      
+      python3 -m modal token set --token-id $MODAL_TOKEN_ID --token-secret $MODAL_TOKEN_SECRET || { echo "Failed to set Modal token"; exit 1; }
+      echo "Build completed successfully"
     startCommand: gunicorn app:app
     pythonVersion: 3.11.0
     envVars:

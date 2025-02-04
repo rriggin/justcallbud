@@ -33,8 +33,26 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"prompt_text": "How do I fix a leaky faucet?", "history": []}'
           
-      - name: Deploy to Render
+      - name: Trigger Render Deploy
         env:
           RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
         run: |
-          curl -s -X POST $RENDER_DEPLOY_HOOK
+          echo "Triggering Render deployment..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $RENDER_DEPLOY_HOOK)
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          
+          echo "Render response: $BODY"
+          echo "HTTP status: $HTTP_STATUS"
+          
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "Error: Render deployment trigger failed with status $HTTP_STATUS"
+            echo "Response: $BODY"
+            exit 1
+          fi
+          
+          echo "Render deployment triggered successfully"
+          
+          # Wait for deployment to start
+          echo "Waiting for deployment to start..."
+          sleep 30
