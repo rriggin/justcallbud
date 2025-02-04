@@ -83,7 +83,8 @@ class LLM:
             self.model = AutoModelForCausalLM.from_pretrained(
                 "meta-llama/Llama-2-7b-chat-hf",
                 torch_dtype=dtype,
-                device_map="auto",
+                device_map="auto",  # Let accelerate handle device mapping
+                low_cpu_mem_usage=True,
                 token=hf_token
             )
             logger.info("Model loaded successfully")
@@ -96,8 +97,7 @@ class LLM:
                 max_new_tokens=500,
                 temperature=0.7,
                 top_p=0.95,
-                repetition_penalty=1.15,
-                device=device
+                repetition_penalty=1.15
             )
             logger.info("Pipeline setup complete")
         except Exception as e:
