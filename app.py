@@ -280,9 +280,21 @@ def chat():
                 try:
                     # Pass both prompt and history to Modal function
                     logger.info("Calling Modal function...")
-                    if not modal_app or not modal_app.is_running():
-                        logger.info("Modal app not running, starting it...")
-                        modal_app.run()
+                    if not modal_initialized or not modal_function:
+                        logger.info("Modal not initialized, attempting to initialize...")
+                        try:
+                            from modal_functions import app as modal_app, chat
+                            modal_app.run()
+                            modal_function = chat
+                            modal_initialized = True
+                            logger.info("Modal reinitialized successfully")
+                        except Exception as e:
+                            error_msg = f"Failed to reinitialize Modal: {str(e)}"
+                            logger.error(error_msg)
+                            yield f"data: {json.dumps({'content': error_msg, 'done': False})}\n\n"
+                            yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
+                            return
+
                     response_text = modal_function.remote(prompt_text, history)
                     logger.info("Modal function call successful")
                     yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
