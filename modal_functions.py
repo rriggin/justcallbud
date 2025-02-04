@@ -46,10 +46,9 @@ prompt = ChatPromptTemplate.from_messages([
     ("human", "{input}")
 ])
 
-app = modal.App("just-call-bud-prod")
-stub = modal.Stub("just-call-bud-prod")
+app = App("just-call-bud-prod")
 
-@stub.cls(
+@app.cls(
     image=create_image(),
     gpu="A10G",
     timeout=600,  # 10 minutes timeout
@@ -126,13 +125,12 @@ class LLM:
             logger.error(f"Error during generation: {str(e)}")
             raise
 
-@stub.function(
+@app.function(
     image=create_image(),
     gpu="A10G",
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
-@modal.web_endpoint()
 async def chat(prompt_text: str, history=None) -> str:
     logger.info("Chat function called")
     try:
@@ -150,4 +148,4 @@ async def chat(prompt_text: str, history=None) -> str:
         raise
 
 if __name__ == "__main__":
-    stub.serve() 
+    app.run() 
