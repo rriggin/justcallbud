@@ -56,9 +56,9 @@ modal_initialized = False
 if USE_MODAL:
     try:
         logger.info("Initializing Modal client...")
-        modal_function = modal.Function.from_name("just-call-bud-prod", "chat")
+        modal_function = "https://rriggin--just-call-bud-prod--chat-prod.modal.run"  # Production Modal endpoint URL
         modal_initialized = True
-        logger.info("Modal client initialized successfully")
+        logger.info("Modal endpoint URL set successfully")
     except Exception as e:
         logger.error(f"Error initializing Modal client: {str(e)}")
         logger.error("Full error details:", exc_info=True)
@@ -264,14 +264,19 @@ def chat():
             if USE_MODAL:
                 try:
                     if not modal_initialized or not modal_function:
-                        raise RuntimeError("Modal client not properly initialized. Please check server logs.")
+                        raise RuntimeError("Modal endpoint URL not properly initialized. Please check server logs.")
                         
-                    logger.info("Calling Modal function...")
-                    response_text = modal_function.remote({
-                        "prompt_text": prompt_text,
-                        "history": history
-                    })
-                    logger.info("Modal function call successful")
+                    logger.info("Calling Modal endpoint...")
+                    response = requests.post(
+                        modal_function,
+                        json={
+                            "prompt_text": prompt_text,
+                            "history": [{"content": msg.content, "type": "human" if isinstance(msg, HumanMessage) else "ai"} for msg in history]
+                        }
+                    )
+                    response.raise_for_status()
+                    response_text = response.text
+                    logger.info("Modal endpoint call successful")
                     yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
                     collected_response = [response_text]
                 except Exception as e:
