@@ -46,7 +46,7 @@ prompt = ChatPromptTemplate.from_messages([
     ("human", "{input}")
 ])
 
-app = modal.App("just-call-bud-prod", is_ephemeral=False)
+app = modal.App("just-call-bud-prod")
 
 @app.cls(
     image=create_image(),
