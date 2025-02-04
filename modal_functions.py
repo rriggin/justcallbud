@@ -55,14 +55,6 @@ app = modal.App("just-call-bud-prod")
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
 class LLM:
-    def __enter__(self):
-        self.__init__()
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        # Cleanup if needed
-        pass
-
     def __init__(self):
         logger.info("Initializing LLM class...")
         try:
@@ -143,12 +135,12 @@ async def chat(prompt_text: str, history=None) -> str:
     logger.info("Chat function called")
     try:
         logger.info("Creating LLM instance...")
-        with LLM() as llm:
-            logger.info("LLM instance created")
-            logger.info(f"Generating response for prompt: {prompt_text[:50]}...")
-            response = await llm.generate(prompt_text, history)
-            logger.info("Response generated successfully")
-            return response
+        llm = LLM()
+        logger.info("LLM instance created")
+        logger.info(f"Generating response for prompt: {prompt_text[:50]}...")
+        response = await llm.generate(prompt_text, history)
+        logger.info("Response generated successfully")
+        return response
     except Exception as e:
         logger.error(f"Error in chat function: {str(e)}")
         logger.error(f"Full error details: {repr(e)}")
