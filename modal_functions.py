@@ -1,5 +1,5 @@
 import modal
-from modal import App, Image, Secret
+from modal import App, Image, Secret, web_endpoint
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain.memory import ConversationBufferMemory
@@ -8,6 +8,7 @@ import torch
 import logging
 import os
 from huggingface_hub import login
+from fastapi import Request
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -131,8 +132,8 @@ class LLM:
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")]
 )
-@modal.web_endpoint(method="POST")
-async def chat(request: modal.Request) -> str:
+@web_endpoint(method="POST")
+async def chat(request: Request) -> str:
     logger.info("Chat function called")
     try:
         # Parse request data
