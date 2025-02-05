@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Create a persistent storage for model weights
 CACHE_DIR = "/root/model_cache"
 app = modal.App("just-call-bud-prod")
-volume = modal.Volume.create(size=20)
+volume = modal.Volume(path=CACHE_DIR, size=20)
 
 def create_image():
     return (
@@ -58,7 +58,7 @@ prompt = ChatPromptTemplate.from_messages([
     gpu="A10G",
     timeout=600,  # 10 minutes timeout
     secrets=[modal.Secret.from_name("huggingface-secret")],
-    network_file_systems={CACHE_DIR: volume}
+    volumes={CACHE_DIR: volume}
 )
 class LLM:
     def __enter__(self):
@@ -128,7 +128,7 @@ class LLM:
     gpu="A10G",
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")],
-    network_file_systems={CACHE_DIR: volume},
+    volumes={CACHE_DIR: volume},
     is_generator=False
 )
 async def chat(data: dict) -> str:
