@@ -61,8 +61,9 @@ class LLM:
         self.model = None
         self.pipe = None
         self.device = None
-        
-    def __enter__(self):
+
+    @modal.enter()
+    def enter(self):
         logger.info("Initializing LLM class...")
         
         # Set PyTorch to use CUDA
@@ -113,9 +114,9 @@ class LLM:
         )
         
         logger.info("Model initialization complete")
-        return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    @modal.exit()
+    def exit(self):
         # Cleanup is handled by Modal
         pass
 
@@ -161,9 +162,9 @@ async def chat(data: dict) -> str:
                 else:
                     history.append(AIMessage(content=content))
         
-        with LLM() as llm:
-            response = llm.generate(prompt_text, history)
-            return str(response)
+        llm = LLM()
+        response = llm.generate(prompt_text, history)
+        return str(response)
             
     except Exception as e:
         logger.error(f"Error in chat function: {str(e)}")
