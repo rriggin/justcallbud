@@ -136,23 +136,31 @@ class LLM:
 async def chat(data: dict) -> str:
     logger.info("Chat function called")
     try:
-        # Get data from request
-        prompt_text = data.get("prompt_text", "")
+        # Handle both form-data and JSON input
+        logger.info(f"Received data: {data}")
+        
+        # Extract prompt from either form-data content or JSON prompt_text
+        prompt_text = data.get("content") or data.get("prompt_text", "")
         raw_history = data.get("history", [])
         
         # Log input data for debugging
-        logger.info(f"Received prompt_text: {prompt_text}")
+        logger.info(f"Extracted prompt_text: {prompt_text}")
         logger.info(f"Received history length: {len(raw_history)}")
         
         # Convert history format
         history = []
         for msg in raw_history:
-            content = msg.get("content", "")
-            msg_type = msg.get("type", "human")
-            if msg_type == "human":
-                history.append(HumanMessage(content=content))
+            if isinstance(msg, str):
+                # Handle string messages (from form-data)
+                history.append(HumanMessage(content=msg))
             else:
-                history.append(AIMessage(content=content))
+                # Handle dict messages (from JSON)
+                content = msg.get("content", "")
+                msg_type = msg.get("type", "human")
+                if msg_type == "human":
+                    history.append(HumanMessage(content=content))
+                else:
+                    history.append(AIMessage(content=content))
         
         logger.info("Creating LLM instance...")
         llm = LLM()
