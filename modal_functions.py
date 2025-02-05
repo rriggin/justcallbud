@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Create app and volume for persistent storage
 app = modal.App("just-call-bud-prod")
-volume = modal.Volume(path="/cache", size=20)
+volume = modal.Volume.from_name("llama-cache", create_if_missing=True)
 
 def create_image():
     return (
@@ -49,7 +49,7 @@ Keep all responses focused on technical details and solutions."""
     gpu="A10G",  # Using A10G for good performance/cost ratio
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")],
-    volumes={"/cache": volume},
+    volumes={"/llama-cache": volume},
     container_idle_timeout=300  # Keep container alive for 5 minutes between requests
 )
 class LLM:
@@ -68,7 +68,7 @@ class LLM:
         logger.info("Loading tokenizer...")
         self.tokenizer = AutoTokenizer.from_pretrained(
             "meta-llama/Llama-2-7b-chat-hf",
-            cache_dir="/cache",
+            cache_dir="/llama-cache",
             use_fast=True  # Use faster tokenizer implementation
         )
         
@@ -76,7 +76,7 @@ class LLM:
         logger.info("Loading model...")
         self.model = AutoModelForCausalLM.from_pretrained(
             "meta-llama/Llama-2-7b-chat-hf",
-            cache_dir="/cache",
+            cache_dir="/llama-cache",
             device_map="auto",
             torch_dtype=torch.float16,
             low_cpu_mem_usage=True,
@@ -131,7 +131,7 @@ class LLM:
     gpu="A10G",
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")],
-    volumes={"/cache": volume}
+    volumes={"/llama-cache": volume}
 )
 async def chat(data: dict) -> str:
     logger.info("Chat function called")
