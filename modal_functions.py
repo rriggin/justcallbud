@@ -85,26 +85,27 @@ class Model:
         )
         
         # Load model with optimizations
+        logger.info("Loading model with device_map='auto' for optimal placement...")
         self.model = AutoModelForCausalLM.from_pretrained(
             "meta-llama/Llama-2-7b-chat-hf",
             cache_dir=MODEL_DIR,
-            device_map="auto",
+            device_map="auto",  # This handles device placement automatically
             torch_dtype=torch.float16,
             low_cpu_mem_usage=True,
             use_cache=True,
             token=self.hf_token
         )
         
-        # Move model to GPU and optimize
-        self.model.to(self.device)
+        # Model is already placed on devices by device_map="auto"
         self.model.eval()
             
-        # Set up pipeline
+        # Set up pipeline with the model's device mapping
+        logger.info("Setting up pipeline...")
         self.pipe = pipeline(
             "text-generation",
             model=self.model,
             tokenizer=self.tokenizer,
-            device=self.device,
+            device_map="auto",  # Use the same device mapping as the model
             max_new_tokens=512,
             temperature=0.7,
             top_p=0.95,
