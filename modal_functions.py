@@ -56,6 +56,12 @@ Keep all responses focused on technical details and solutions."""
     container_idle_timeout=300  # Keep container alive for 5 minutes between requests
 )
 class LLM:
+    def __init__(self):
+        self.tokenizer = None
+        self.model = None
+        self.pipe = None
+        self.device = None
+        
     def __enter__(self):
         logger.info("Initializing LLM class...")
         
