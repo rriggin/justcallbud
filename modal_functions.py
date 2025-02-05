@@ -130,7 +130,8 @@ class LLM:
     image=create_image(),
     gpu="A10G",
     timeout=600,
-    secrets=[modal.Secret.from_name("huggingface-secret")]
+    secrets=[modal.Secret.from_name("huggingface-secret")],
+    is_generator=False  # Explicitly set this to ensure non-streaming behavior
 )
 async def chat(data: dict) -> str:
     logger.info("Chat function called")
@@ -138,6 +139,10 @@ async def chat(data: dict) -> str:
         # Get data from request
         prompt_text = data.get("prompt_text", "")
         raw_history = data.get("history", [])
+        
+        # Log input data for debugging
+        logger.info(f"Received prompt_text: {prompt_text}")
+        logger.info(f"Received history length: {len(raw_history)}")
         
         # Convert history format
         history = []
@@ -154,8 +159,9 @@ async def chat(data: dict) -> str:
         logger.info("LLM instance created")
         logger.info(f"Generating response for prompt: {prompt_text[:50]}...")
         response = await llm.generate(prompt_text, history)
-        logger.info("Response generated successfully")
-        return response
+        logger.info(f"Response generated successfully. Type: {type(response)}, Length: {len(str(response))}")
+        logger.info(f"Response preview: {str(response)[:100]}...")
+        return str(response)  # Ensure we return a string
     except Exception as e:
         logger.error(f"Error in chat function: {str(e)}")
         logger.error(f"Full error details: {repr(e)}")
