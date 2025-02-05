@@ -8,6 +8,7 @@ import torch
 import logging
 import os
 from huggingface_hub import login
+from typing import List, Any
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -58,73 +59,57 @@ app = App("just-call-bud-prod")
 class LLM:
     def __init__(self):
         logger.info("Initializing LLM class...")
-        try:
-            # Get Hugging Face token from environment
-            hf_token = os.environ["HUGGINGFACE_TOKEN"]
-            logger.info("Retrieved Hugging Face token from environment")
-            
-            # Log in to Hugging Face
-            logger.info("Logging in to Hugging Face...")
-            login(token=hf_token)
-            logger.info("Successfully logged in to Hugging Face")
-            
-            logger.info("Loading tokenizer...")
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                "meta-llama/Llama-2-7b-chat-hf",
-                token=hf_token
-            )
-            logger.info("Tokenizer loaded successfully")
+        self.hf_token = os.environ.get("HUGGINGFACE_TOKEN")
+        if not self.hf_token:
+            raise ValueError("HUGGINGFACE_TOKEN not found in environment")
+        logger.info("Retrieved Hugging Face token from environment")
+        
+        logger.info("Logging in to Hugging Face...")
+        login(token=self.hf_token)
+        logger.info("Successfully logged in to Hugging Face")
+        
+        logger.info("Loading tokenizer...")
+        self.tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
+        logger.info("Tokenizer loaded successfully")
+        
+        logger.info("Loading model...")
+        self.model = AutoModelForCausalLM.from_pretrained(
+            "meta-llama/Llama-2-7b-chat-hf",
+            device_map="auto",
+            torch_dtype=torch.float16
+        )
+        logger.info("Model loaded successfully")
+        
+        logger.info("Setting up pipeline...")
+        self.pipe = pipeline(
+            "text-generation",
+            model=self.model,
+            tokenizer=self.tokenizer,
+            max_new_tokens=512,
+            temperature=0.7,
+            top_p=0.95,
+            repetition_penalty=1.15
+        )
+        logger.info("Pipeline setup complete")
 
-            logger.info("Loading model...")
-            self.model = AutoModelForCausalLM.from_pretrained(
-                "meta-llama/Llama-2-7b-chat-hf",
-                torch_dtype=torch.float16,
-                device_map="auto",
-                token=hf_token
-            )
-            logger.info("Model loaded successfully")
-
-            logger.info("Setting up pipeline...")
-            self.pipeline = pipeline(
-                "text-generation",
-                model=self.model,
-                tokenizer=self.tokenizer,
-                max_new_tokens=500,
-                temperature=0.7,
-                top_p=0.95,
-                repetition_penalty=1.15
-            )
-            logger.info("Pipeline setup complete")
-        except Exception as e:
-            logger.error(f"Error during initialization: {str(e)}")
-            raise
-
-    async def generate(self, prompt_text: str, history=None) -> str:
-        try:
-            logger.info("Starting text generation...")
-            if history is None:
-                history = []
-            
-            logger.info("Formatting prompt with history...")
-            chain_input = {
-                "history": history,
-                "input": prompt_text
-            }
-            formatted_prompt = prompt.format_messages(**chain_input)
-            
-            full_prompt = "\n".join([msg.content for msg in formatted_prompt])
-            logger.info("Prompt formatted successfully")
-            
-            logger.info("Generating response...")
-            response = self.pipeline(full_prompt)[0]['generated_text']
-            logger.info("Response generated successfully")
-            
-            new_content = response[len(full_prompt):].strip()
-            logger.info("Response processed and ready to return")
-            return new_content
-        except Exception as e:
-            logger.error(f"Error during generation: {str(e)}")
-            raise
+    async def generate(self, prompt_text: str, history: List[Any]) -> str:
+        logger.info("Starting text generation...")
+        
+        # Format the prompt with clear instructions
+        logger.info("Formatting prompt with history...")
+        system_prompt = """You are Bud, an experienced AI handyman assistant. Your role is to provide helpful, practical advice for home maintenance and repair issues. When users describe problems, provide clear, step-by-step solutions and safety precautions. Be thorough but conversational in your responses."""
+        
+        formatted_prompt = f"{system_prompt}\n\nUser: {prompt_text}\n\nBud:"
+        logger.info("Prompt formatted successfully")
+        
+        logger.info("Generating response...")
+        result = self.pipe(formatted_prompt, return_full_text=False)[0]['generated_text']
+        logger.info("Response generated successfully")
+        
+        # Process and clean up the response
+        response = result.strip()
+        logger.info("Response processed and ready to return")
+        return response
 
 @app.function(
     image=create_image(),
