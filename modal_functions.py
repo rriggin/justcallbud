@@ -1,5 +1,5 @@
 import modal
-from modal import App, Image, Secret, web_endpoint
+from modal import App, Image, Secret, web_endpoint, Volume
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain.memory import ConversationBufferMemory
@@ -13,6 +13,9 @@ from typing import List, Any
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Create a volume to store model weights
+volume = Volume.persisted("llama-2-cache")
 
 def create_image():
     return (
@@ -54,10 +57,11 @@ app = App("just-call-bud-prod")
     image=create_image(),
     gpu="A10G",
     timeout=600,  # 10 minutes timeout
-    secrets=[modal.Secret.from_name("huggingface-secret")]
+    secrets=[modal.Secret.from_name("huggingface-secret")],
+    volumes={"/model_cache": volume}  # Mount the volume
 )
 class LLM:
-    def __init__(self):
+    def __enter__(self):
         logger.info("Initializing LLM class...")
         self.hf_token = os.environ.get("HUGGINGFACE_TOKEN")
         if not self.hf_token:
@@ -68,15 +72,21 @@ class LLM:
         login(token=self.hf_token)
         logger.info("Successfully logged in to Hugging Face")
         
-        logger.info("Loading tokenizer...")
-        self.tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
+        cache_dir = "/model_cache"
+        
+        logger.info("Loading tokenizer from cache or downloading...")
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            "meta-llama/Llama-2-7b-chat-hf",
+            cache_dir=cache_dir
+        )
         logger.info("Tokenizer loaded successfully")
         
-        logger.info("Loading model...")
+        logger.info("Loading model from cache or downloading...")
         self.model = AutoModelForCausalLM.from_pretrained(
             "meta-llama/Llama-2-7b-chat-hf",
             device_map="auto",
-            torch_dtype=torch.float16
+            torch_dtype=torch.float16,
+            cache_dir=cache_dir
         )
         logger.info("Model loaded successfully")
         
@@ -91,6 +101,10 @@ class LLM:
             repetition_penalty=1.15
         )
         logger.info("Pipeline setup complete")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
 
     async def generate(self, prompt_text: str, history: List[Any]) -> str:
         logger.info("Starting text generation...")
@@ -116,7 +130,8 @@ class LLM:
     gpu="A10G",
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")],
-    is_generator=False  # Explicitly set this to ensure non-streaming behavior
+    volumes={"/model_cache": volume},  # Mount the volume
+    is_generator=False
 )
 async def chat(data: dict) -> str:
     logger.info("Chat function called")
@@ -148,13 +163,13 @@ async def chat(data: dict) -> str:
                     history.append(AIMessage(content=content))
         
         logger.info("Creating LLM instance...")
-        llm = LLM()
-        logger.info("LLM instance created")
-        logger.info(f"Generating response for prompt: {prompt_text[:50]}...")
-        response = await llm.generate(prompt_text, history)
-        logger.info(f"Response generated successfully. Type: {type(response)}, Length: {len(str(response))}")
-        logger.info(f"Response preview: {str(response)[:100]}...")
-        return str(response)  # Ensure we return a string
+        with LLM() as llm:
+            logger.info("LLM instance created")
+            logger.info(f"Generating response for prompt: {prompt_text[:50]}...")
+            response = await llm.generate(prompt_text, history)
+            logger.info(f"Response generated successfully. Type: {type(response)}, Length: {len(str(response))}")
+            logger.info(f"Response preview: {str(response)[:100]}...")
+            return str(response)  # Ensure we return a string
     except Exception as e:
         logger.error(f"Error in chat function: {str(e)}")
         logger.error(f"Full error details: {repr(e)}")
