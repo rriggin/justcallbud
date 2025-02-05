@@ -268,35 +268,18 @@
             }
         }
 
+        // Add function to display messages in chat
         function addMessageToUI(message) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `flex ${message.isUser ? 'justify-end' : 'justify-start'} mb-4`;
             
-            // Format the content with proper spacing and lists
-            let formattedContent = message.content;
-            
-            // Handle numbered lists with proper formatting
-            formattedContent = formattedContent.replace(/(\d+)\.\s+([^\n]+)/g, (match, number, text) => {
-                return `<div class="flex gap-2"><span class="flex-shrink-0">${number}.</span><span>${text}</span></div>`;
-            });
-
-            // Split paragraphs and add proper spacing
-            formattedContent = formattedContent.split('\n\n').map(para => {
-                if (para.includes('<div class="flex gap-2">')) {
-                    // If it's a list, wrap it in a list container
-                    return `<div class="space-y-2">${para}</div>`;
-                }
-                return `<p class="mb-4 last:mb-0">${para.trim()}</p>`;
-            }).join('');
-            
-            // Add message content
             messageDiv.innerHTML = `
                 <div class="max-w-[85%] rounded-lg px-3 py-2 ${
                     message.isUser
                         ? 'bg-blue-600 text-white'
                         : 'bg-white text-gray-900 border border-gray-100'
                 } shadow-sm">
-                    ${formattedContent}
+                    <p class="mb-4 last:mb-0">${message.content}</p>
                     ${!message.isUser ? `
                         <div class="mt-3 flex justify-center">
                             <button class="request-quote px-4 py-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors">
@@ -307,26 +290,7 @@
                 </div>
             `;
             messagesContainer.appendChild(messageDiv);
-            
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-            // Add event listeners for the quote button if it exists
-            if (!message.isUser && message.showContactButton) {
-                const requestQuoteBtn = messageDiv.querySelector('.request-quote');
-                if (requestQuoteBtn) {
-                    requestQuoteBtn.addEventListener('click', () => {
-                        const template = document.getElementById('quote-form-template');
-                        const formNode = template.content.cloneNode(true);
-                        messagesContainer.appendChild(formNode);
-                        
-                        // Add form submission handler
-                        const form = messagesContainer.querySelector('#quote-request-form');
-                        form.addEventListener('submit', handleQuoteRequest);
-                        
-                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                    });
-                }
-            }
         }
 
         // Add image upload handler
@@ -352,6 +316,8 @@
             e.preventDefault();
             const content = input.value.trim();
             console.log('Content:', content);
+            
+            // Allow submission if there's either content or an image
             if (!content && !currentImage) return;
 
             // Clear input immediately after getting content
@@ -359,16 +325,12 @@
             input.style.height = 'auto'; // Reset height for textarea
             
             try {
-                isStreaming = true;
-                scrollIndicator.classList.add('visible');
-                scrollIndicator.classList.remove('hidden');
-
-                // Add user message immediately
-                addMessageToUI({ content, isUser: true });
+                // Add user message immediately if there's content
+                if (content) {
+                    addMessageToUI({ content, isUser: true });
+                }
                 if (currentImage) {
                     addImageToUI(URL.createObjectURL(currentImage), true);
-                    currentImage = null;
-                    imagePreview.classList.add('hidden');
                 }
 
                 input.disabled = true;
@@ -376,107 +338,42 @@
 
                 console.log('Sending request to /api/chat...');
                 const formData = new FormData();
-                formData.append('content', content);
+                if (content) {
+                    formData.append('content', content);
+                }
                 if (currentImage) {
                     formData.append('image', currentImage);
+                    // Add a default message if there's no content
+                    if (!content) {
+                        formData.append('content', 'Image analysis request');
+                    }
                 }
+
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     body: formData
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Network response was not ok: ${await response.text()}`);
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Network response was not ok');
                 }
 
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                let responseText = '';
-                let tempMessageDiv = null;
-
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
-                    
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const data = JSON.parse(line.slice(5));
-                            if (data.done) {
-                                isStreaming = false;
-                                checkScroll();
-                                if (tempMessageDiv) {
-                                    const messageContainer = tempMessageDiv.querySelector('div');
-                                    messageContainer.innerHTML = `
-                                        ${messageContainer.innerHTML}
-                                        <div class="mt-3 flex justify-center">
-                                            <button class="request-quote px-4 py-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors">
-                                                Contact a local pro
-                                            </button>
-                                        </div>
-                                    `;
-                                }
-                                break;
-                            }
-                            
-                            // Only create the message container when we receive the first content
-                            if (!tempMessageDiv && data.content) {
-                                tempMessageDiv = document.createElement('div');
-                                tempMessageDiv.className = 'flex justify-start mb-4';
-                                tempMessageDiv.innerHTML = `
-                                    <div class="max-w-[85%] rounded-lg px-3 py-2 bg-white text-gray-900 border border-gray-100 shadow-sm">
-                                        <p class="mb-4 last:mb-0"></p>
-                                    </div>
-                                `;
-                                messagesContainer.appendChild(tempMessageDiv);
-                            }
-                            
-                            responseText += data.content;
-                            
-                            if (tempMessageDiv) {
-                                // Format the response text with proper spacing and lists
-                                let formattedText = responseText;
-                                // Handle numbered lists
-                                formattedText = formattedText.replace(/(\d+)\.\s+([^\n]+)/g, (match, number, text) => {
-                                    return `<div class="flex gap-2"><span class="flex-shrink-0">${number}.</span><span>${text}</span></div>`;
-                                });
-                                
-                                // Split paragraphs and add proper spacing
-                                formattedText = formattedText.split('\n\n').map(para => {
-                                    if (para.includes('<div class="flex gap-2">')) {
-                                        return `<div class="space-y-2">${para}</div>`;
-                                    }
-                                    return `<p class="mb-4 last:mb-0">${para.trim()}</p>`;
-                                }).join('');
-                                
-                                tempMessageDiv.querySelector('div').innerHTML = formattedText;
-                                
-                                // Only auto-scroll if we're near the bottom
-                                const { scrollTop, scrollHeight, clientHeight } = messagesContainer;
-                                const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-                                if (isNearBottom) {
-                                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                                }
-                            }
-                        }
-                    }
-                }
+                const data = await response.json();
+                addMessageToUI(data);
 
             } catch (error) {
                 console.error('Full error details:', error);
                 console.error('Error stack:', error.stack);
                 
                 addMessageToUI({
-                    content: "Sorry, there was an error. Please try again.",
+                    content: "Sorry, there was an error processing your request. Please try again.",
                     isUser: false
                 });
             } finally {
-                isStreaming = false;
-                checkScroll();
                 currentImage = null;
                 imagePreview.classList.add('hidden');
+                imageUpload.value = ''; // Clear the file input
                 input.disabled = false;
                 form.querySelector('button').disabled = false;
                 input.focus();

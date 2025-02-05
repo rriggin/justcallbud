@@ -146,8 +146,14 @@ async def chat(data: dict) -> str:
     logger.info("Chat function called")
     try:
         prompt_text = data.get("content") or data.get("prompt_text", "")
+        image_path = data.get("image_path")
+        
         if not prompt_text:
             raise ValueError("No prompt text provided")
+            
+        # If there's an image, add context to the prompt
+        if image_path:
+            prompt_text = f"The user has uploaded an image ({image_path}). Please analyze this image along with their message: {prompt_text}"
             
         # Initialize and load model
         model = Model()

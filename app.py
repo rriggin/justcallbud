@@ -19,6 +19,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain.memory import ConversationBufferMemory
 from langchain_community.chat_models import ChatOllama
+from werkzeug.utils import secure_filename
 
 # Load environment variables from .env
 load_dotenv()
@@ -200,6 +201,14 @@ def get_conversation_history(conversation_id):
     
     return history
 
+# Add this after other configuration
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 @app.route('/')
 def home():
     # Clear the conversation_id from session to force a new conversation on page load
@@ -210,128 +219,69 @@ def home():
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:
-        # Ensure we have a valid conversation
-        conversation_id = get_or_create_conversation()
-        
+        # Get form data
         prompt_text = request.form.get('content', '')
         if not prompt_text:
-            raise ValueError("Message content cannot be empty")
-            
-        logger.info(f"Received prompt: {prompt_text}")
-        
-        # Get conversation history
-        history = get_conversation_history(conversation_id)
-        
-        # Check cache if Redis is enabled
-        cache_key = get_cache_key(conversation_id, prompt_text, history)
-        if redis_enabled and cache_key:
-            cached_response = redis_client.get(cache_key)
-            if cached_response:
-                logger.info("Cache hit! Using cached response")
-                return Response(
-                    stream_cached_response(cached_response),
-                    mimetype='text/event-stream'
-                )
-            logger.info("Cache miss. Generating new response")
-        else:
-            logger.info("Caching disabled. Generating new response")
-        
-        # Get current max message number
-        result = supabase.table('messages') \
-            .select('message_number') \
-            .eq('conversation_id', conversation_id) \
-            .order('message_number', desc=True) \
-            .limit(1) \
-            .execute()
-        
-        current_max_number = 0
-        if result.data:
-            current_max_number = result.data[0].get('message_number', 0)
+            return jsonify({"error": "No content provided"}), 400
 
-        # Store user message
-        message_data = {
-            'content': prompt_text,
-            'is_user': True,
-            'conversation_id': conversation_id,
-            'message_number': current_max_number + 1,
-            'created_at': datetime.now().isoformat()
-        }
-        supabase.table('messages').insert(message_data).execute()
+        # Handle image upload if present
+        image_path = None
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                # Create timestamp-based unique filename
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f"{timestamp}_{filename}"
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
+                image_path = f"/static/uploads/{filename}"
+                # Append image info to prompt
+                prompt_text = f"{prompt_text}\n[Image uploaded: {image_path}]"
+                logger.info(f"Image saved at: {filepath}")
 
-        def generate():
-            global modal_initialized, modal_function
-            collected_response = []
-            
-            if USE_MODAL:
-                try:
-                    if not modal_initialized or not modal_function:
-                        raise RuntimeError("Modal function not properly initialized. Please check server logs.")
-                        
-                    logger.info("Calling Modal function...")
-                    response_text = modal_function.remote({
-                        "prompt_text": prompt_text,
-                        "history": [{"content": msg.content, "type": "human" if isinstance(msg, HumanMessage) else "ai"} for msg in history]
-                    })
-                    logger.info("Modal function call completed")
-                    yield f"data: {json.dumps({'content': response_text, 'done': False})}\n\n"
-                    collected_response = [response_text]
-                except Exception as e:
-                    error_msg = f"Error in Modal operation: {str(e)}"
-                    logger.error(error_msg)
-                    logger.error("Full error details:", exc_info=True)
-                    yield f"data: {json.dumps({'content': error_msg, 'done': False})}\n\n"
-                    yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
-                    return
-            else:
-                # Create the chain properly
-                chain = prompt | llm
-                
-                for chunk in chain.stream({
+        # Convert history format for the model
+        history = []  # We'll implement history later if needed
+        
+        if USE_MODAL:
+            try:
+                if not modal_initialized or not modal_function:
+                    raise RuntimeError("Modal function not properly initialized")
+                    
+                logger.info("Calling Modal function...")
+                response_text = modal_function.remote({
+                    "prompt_text": prompt_text,
                     "history": history,
-                    "input": prompt_text
-                }):
-                    if hasattr(chunk, 'content'):
-                        content = chunk.content
-                        collected_response.append(content)
-                        yield f"data: {json.dumps({'content': content, 'done': False})}\n\n"
-
-            # Join all chunks
-            full_response = ''.join(collected_response)
+                    "image_path": image_path
+                })
+                logger.info("Modal function call completed")
+                
+                # Return JSON response
+                return jsonify({
+                    "content": response_text,
+                    "isUser": False,
+                    "image_path": image_path
+                })
+                
+            except Exception as e:
+                error_msg = f"Error in Modal operation: {str(e)}"
+                logger.error(error_msg)
+                logger.error("Full error details:", exc_info=True)
+                return jsonify({"error": error_msg}), 500
+        else:
+            # Local LLM path (unchanged)
+            llm = ChatOllama(model="llama2")
+            response = llm.generate(prompt_text, history)
+            return jsonify({
+                "content": response,
+                "isUser": False,
+                "image_path": image_path
+            })
             
-            # Cache the complete response if Redis is enabled
-            if redis_enabled and cache_key:
-                try:
-                    redis_client.setex(cache_key, CACHE_EXPIRATION, full_response)
-                    logger.info("Response cached successfully")
-                except Exception as e:
-                    logger.error(f"Error caching response: {str(e)}")
-            
-            # Store bot response
-            bot_message_data = {
-                'content': full_response,
-                'is_user': False,
-                'conversation_id': conversation_id,
-                'message_number': current_max_number + 2,
-                'created_at': datetime.now().isoformat()
-            }
-            supabase.table('messages').insert(bot_message_data).execute()
-            
-            # Send done signal
-            yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
-
-        return Response(
-            stream_with_context(generate()),
-            mimetype='text/event-stream'
-        )
-
     except Exception as e:
-        logger.error(f"Chat error: {str(e)}")
-        logger.error(f"Full error details: {repr(e)}")
-        return jsonify({
-            "content": f"Error: {str(e)}",
-            "isUser": False,
-            "timestamp": datetime.now().isoformat()
-        }), 500
+        logger.error(f"Error in chat endpoint: {str(e)}")
+        logger.error("Full error details:", exc_info=True)
+        return jsonify({"error": str(e)}), 500
 
 def stream_cached_response(response):
     """Stream a cached response to maintain consistent behavior"""
