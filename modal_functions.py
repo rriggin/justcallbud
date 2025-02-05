@@ -2,22 +2,19 @@ import modal
 from modal import Image, Secret
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from langchain.memory import ConversationBufferMemory
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import torch
 import logging
 import os
-from huggingface_hub import login
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 from typing import List, Any
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create a persistent storage for model weights
-CACHE_DIR = "/root/model_cache"
+# Create app and volume for persistent storage
 app = modal.App("just-call-bud-prod")
-volume = modal.Volume(path=CACHE_DIR, size=20)
+volume = modal.Volume(path="/cache", size=20)
 
 def create_image():
     return (
@@ -25,14 +22,14 @@ def create_image():
         .pip_install([
             "torch==2.1.0",
             "transformers==4.37.2",
-            "langchain>=0.1.0",
-            "langchain_core>=0.1.30",
             "accelerate>=0.26.1",
             "huggingface-hub>=0.19.4",
-            "einops>=0.7.0",
-            "safetensors>=0.4.1",
-            "fastapi[standard]>=0.109.0"
+            "safetensors>=0.4.1"
         ])
+        .run_commands(
+            # Install CUDA dependencies
+            "pip install torch==2.1.0+cu118 -f https://download.pytorch.org/whl/cu118/torch_stable.html"
+        )
     )
 
 SYSTEM_PROMPT = """You are Bud, a friendly and knowledgeable AI handyman assistant. 
@@ -47,112 +44,107 @@ Core rules:
 Your purpose is to provide practical, safety-focused home maintenance advice.
 Keep all responses focused on technical details and solutions."""
 
-prompt = ChatPromptTemplate.from_messages([
-    ("system", SYSTEM_PROMPT),
-    MessagesPlaceholder(variable_name="history"),
-    ("human", "{input}")
-])
-
 @app.cls(
     image=create_image(),
-    gpu="A10G",
-    timeout=600,  # 10 minutes timeout
+    gpu="A10G",  # Using A10G for good performance/cost ratio
+    timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")],
-    volumes={CACHE_DIR: volume}
+    volumes={"/cache": volume},
+    container_idle_timeout=300  # Keep container alive for 5 minutes between requests
 )
 class LLM:
     def __enter__(self):
         logger.info("Initializing LLM class...")
-        self.hf_token = os.environ.get("HUGGINGFACE_TOKEN")
-        if not self.hf_token:
-            raise ValueError("HUGGINGFACE_TOKEN not found in environment")
-        logger.info("Retrieved Hugging Face token from environment")
         
-        logger.info("Logging in to Hugging Face...")
-        login(token=self.hf_token)
-        logger.info("Successfully logged in to Hugging Face")
-        
-        logger.info("Loading tokenizer from cache or downloading...")
+        # Set PyTorch to use CUDA
+        if torch.cuda.is_available():
+            logger.info(f"CUDA available. Using GPU: {torch.cuda.get_device_name(0)}")
+            self.device = torch.device("cuda")
+        else:
+            logger.warning("CUDA not available. Using CPU.")
+            self.device = torch.device("cpu")
+            
+        # Load tokenizer
+        logger.info("Loading tokenizer...")
         self.tokenizer = AutoTokenizer.from_pretrained(
             "meta-llama/Llama-2-7b-chat-hf",
-            cache_dir=CACHE_DIR
+            cache_dir="/cache",
+            use_fast=True  # Use faster tokenizer implementation
         )
-        logger.info("Tokenizer loaded successfully")
         
-        logger.info("Loading model from cache or downloading...")
+        # Load model with optimizations
+        logger.info("Loading model...")
         self.model = AutoModelForCausalLM.from_pretrained(
             "meta-llama/Llama-2-7b-chat-hf",
+            cache_dir="/cache",
             device_map="auto",
             torch_dtype=torch.float16,
-            cache_dir=CACHE_DIR
+            low_cpu_mem_usage=True,
+            use_cache=True  # Enable KV cache for faster inference
         )
-        logger.info("Model loaded successfully")
         
+        # Move model to GPU and optimize
+        self.model.to(self.device)
+        if hasattr(self.model, 'eval'):
+            self.model.eval()  # Set to evaluation mode
+            
+        # Set up optimized pipeline
         logger.info("Setting up pipeline...")
         self.pipe = pipeline(
             "text-generation",
             model=self.model,
             tokenizer=self.tokenizer,
+            device=self.device,
             max_new_tokens=512,
             temperature=0.7,
             top_p=0.95,
-            repetition_penalty=1.15
+            repetition_penalty=1.15,
+            torch_dtype=torch.float16,
+            use_cache=True
         )
-        logger.info("Pipeline setup complete")
+        
+        logger.info("Model initialization complete")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        # Cleanup is handled by Modal
         pass
 
-    async def generate(self, prompt_text: str, history: List[Any]) -> str:
-        logger.info("Starting text generation...")
-        
-        # Format the prompt with clear instructions
-        logger.info("Formatting prompt with history...")
-        system_prompt = """You are Bud, an experienced AI handyman assistant. Your role is to provide helpful, practical advice for home maintenance and repair issues. When users describe problems, provide clear, step-by-step solutions and safety precautions. Be thorough but conversational in your responses."""
-        
-        formatted_prompt = f"{system_prompt}\n\nUser: {prompt_text}\n\nBud:"
-        logger.info("Prompt formatted successfully")
-        
+    @torch.inference_mode()  # More efficient than no_grad for inference
+    def generate(self, prompt_text: str, history: List[Any]) -> str:
         logger.info("Generating response...")
-        result = self.pipe(formatted_prompt, return_full_text=False)[0]['generated_text']
-        logger.info("Response generated successfully")
         
-        # Process and clean up the response
-        response = result.strip()
-        logger.info("Response processed and ready to return")
-        return response
+        formatted_prompt = f"{SYSTEM_PROMPT}\n\nUser: {prompt_text}\n\nBud:"
+        
+        with torch.cuda.amp.autocast():  # Enable automatic mixed precision
+            result = self.pipe(
+                formatted_prompt,
+                return_full_text=False,
+                pad_token_id=self.tokenizer.eos_token_id,
+                eos_token_id=self.tokenizer.eos_token_id,
+            )[0]['generated_text']
+        
+        return result.strip()
 
 @app.function(
     image=create_image(),
     gpu="A10G",
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")],
-    volumes={CACHE_DIR: volume},
-    is_generator=False
+    volumes={"/cache": volume}
 )
 async def chat(data: dict) -> str:
     logger.info("Chat function called")
     try:
-        # Handle both form-data and JSON input
-        logger.info(f"Received data: {data}")
-        
-        # Extract prompt from either form-data content or JSON prompt_text
         prompt_text = data.get("content") or data.get("prompt_text", "")
         raw_history = data.get("history", [])
-        
-        # Log input data for debugging
-        logger.info(f"Extracted prompt_text: {prompt_text}")
-        logger.info(f"Received history length: {len(raw_history)}")
         
         # Convert history format
         history = []
         for msg in raw_history:
             if isinstance(msg, str):
-                # Handle string messages (from form-data)
                 history.append(HumanMessage(content=msg))
             else:
-                # Handle dict messages (from JSON)
                 content = msg.get("content", "")
                 msg_type = msg.get("type", "human")
                 if msg_type == "human":
@@ -160,17 +152,12 @@ async def chat(data: dict) -> str:
                 else:
                     history.append(AIMessage(content=content))
         
-        logger.info("Creating LLM instance...")
         with LLM() as llm:
-            logger.info("LLM instance created")
-            logger.info(f"Generating response for prompt: {prompt_text[:50]}...")
-            response = await llm.generate(prompt_text, history)
-            logger.info(f"Response generated successfully. Type: {type(response)}, Length: {len(str(response))}")
-            logger.info(f"Response preview: {str(response)[:100]}...")
-            return str(response)  # Ensure we return a string
+            response = llm.generate(prompt_text, history)
+            return str(response)
+            
     except Exception as e:
         logger.error(f"Error in chat function: {str(e)}")
-        logger.error(f"Full error details: {repr(e)}")
         logger.error("Stack trace:", exc_info=True)
         raise
 
