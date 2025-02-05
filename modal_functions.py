@@ -56,6 +56,10 @@ class Model:
         self.model = None
         self.pipe = None
         self.device = None
+        # Get Hugging Face token from environment
+        self.hf_token = os.environ["HUGGINGFACE_TOKEN"]
+        if not self.hf_token:
+            raise ValueError("HUGGINGFACE_TOKEN not found in environment")
 
     def load(self):
         """Load the model and tokenizer"""
@@ -73,7 +77,8 @@ class Model:
         self.tokenizer = AutoTokenizer.from_pretrained(
             "meta-llama/Llama-2-7b-chat-hf",
             cache_dir=MODEL_DIR,
-            use_fast=True
+            use_fast=True,
+            token=self.hf_token
         )
         
         # Load model with optimizations
@@ -83,7 +88,8 @@ class Model:
             device_map="auto",
             torch_dtype=torch.float16,
             low_cpu_mem_usage=True,
-            use_cache=True
+            use_cache=True,
+            token=self.hf_token
         )
         
         # Move model to GPU and optimize
@@ -129,7 +135,8 @@ class Model:
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")],
     volumes={MODEL_DIR: volume},
-    container_idle_timeout=300
+    container_idle_timeout=300,
+    secret_environment_variables={"HUGGINGFACE_TOKEN": modal.Secret.from_name("huggingface-secret")["HUGGINGFACE_TOKEN"]}
 )
 async def chat(data: dict) -> str:
     """Handle chat requests"""
