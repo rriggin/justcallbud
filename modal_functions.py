@@ -57,9 +57,12 @@ class Model:
         self.pipe = None
         self.device = None
         # Get Hugging Face token from environment
-        self.hf_token = os.environ["HUGGINGFACE_TOKEN"]
+        self.hf_token = os.environ.get("HUGGINGFACE_TOKEN")
         if not self.hf_token:
-            raise ValueError("HUGGINGFACE_TOKEN not found in environment")
+            logger.warning("HUGGINGFACE_TOKEN not found in environment, trying HF_TOKEN")
+            self.hf_token = os.environ.get("HF_TOKEN")
+        if not self.hf_token:
+            raise ValueError("No Hugging Face token found in environment variables")
 
     def load(self):
         """Load the model and tokenizer"""
@@ -135,8 +138,7 @@ class Model:
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")],
     volumes={MODEL_DIR: volume},
-    container_idle_timeout=300,
-    secret_environment_variables={"HUGGINGFACE_TOKEN": modal.Secret.from_name("huggingface-secret")["HUGGINGFACE_TOKEN"]}
+    container_idle_timeout=300
 )
 async def chat(data: dict) -> str:
     """Handle chat requests"""
