@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 # Create app and volume for persistent storage
 app = modal.App("just-call-bud-prod")
-volume = modal.Volume.from_name("llama-cache", create_if_missing=True)
+
+# Create a volume for model weights
+MODEL_DIR = "/model"
+volume = modal.Volume.from_name("llama-weights", create_if_missing=True)
 
 def create_image():
     return (
@@ -47,24 +50,16 @@ Core rules:
 Your purpose is to provide practical, safety-focused home maintenance advice.
 Keep all responses focused on technical details and solutions."""
 
-@app.cls(
-    image=create_image(),
-    gpu="A10G",  # Using A10G for good performance/cost ratio
-    timeout=600,
-    secrets=[modal.Secret.from_name("huggingface-secret")],
-    volumes={"/llama-cache": volume},
-    container_idle_timeout=300  # Keep container alive for 5 minutes between requests
-)
-class LLM:
+class Model:
     def __init__(self):
         self.tokenizer = None
         self.model = None
         self.pipe = None
         self.device = None
 
-    @modal.enter()
-    def enter(self):
-        logger.info("Initializing LLM class...")
+    def load(self):
+        """Load the model and tokenizer"""
+        logger.info("Loading model and tokenizer...")
         
         # Set PyTorch to use CUDA
         if torch.cuda.is_available():
@@ -75,31 +70,27 @@ class LLM:
             self.device = torch.device("cpu")
             
         # Load tokenizer
-        logger.info("Loading tokenizer...")
         self.tokenizer = AutoTokenizer.from_pretrained(
             "meta-llama/Llama-2-7b-chat-hf",
-            cache_dir="/llama-cache",
-            use_fast=True  # Use faster tokenizer implementation
+            cache_dir=MODEL_DIR,
+            use_fast=True
         )
         
         # Load model with optimizations
-        logger.info("Loading model...")
         self.model = AutoModelForCausalLM.from_pretrained(
             "meta-llama/Llama-2-7b-chat-hf",
-            cache_dir="/llama-cache",
+            cache_dir=MODEL_DIR,
             device_map="auto",
             torch_dtype=torch.float16,
             low_cpu_mem_usage=True,
-            use_cache=True  # Enable KV cache for faster inference
+            use_cache=True
         )
         
         # Move model to GPU and optimize
         self.model.to(self.device)
-        if hasattr(self.model, 'eval'):
-            self.model.eval()  # Set to evaluation mode
+        self.model.eval()
             
-        # Set up optimized pipeline
-        logger.info("Setting up pipeline...")
+        # Set up pipeline
         self.pipe = pipeline(
             "text-generation",
             model=self.model,
@@ -113,20 +104,16 @@ class LLM:
             use_cache=True
         )
         
-        logger.info("Model initialization complete")
+        logger.info("Model loaded successfully")
 
-    @modal.exit()
-    def exit(self):
-        # Cleanup is handled by Modal
-        pass
-
-    @torch.inference_mode()  # More efficient than no_grad for inference
-    def generate(self, prompt_text: str, history: List[Any]) -> str:
+    @torch.inference_mode()
+    def generate(self, prompt_text: str) -> str:
+        """Generate a response for the given prompt"""
         logger.info("Generating response...")
         
         formatted_prompt = f"{SYSTEM_PROMPT}\n\nUser: {prompt_text}\n\nBud:"
         
-        with torch.cuda.amp.autocast():  # Enable automatic mixed precision
+        with torch.cuda.amp.autocast():
             result = self.pipe(
                 formatted_prompt,
                 return_full_text=False,
@@ -141,29 +128,23 @@ class LLM:
     gpu="A10G",
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")],
-    volumes={"/llama-cache": volume}
+    volumes={MODEL_DIR: volume},
+    container_idle_timeout=300
 )
 async def chat(data: dict) -> str:
+    """Handle chat requests"""
     logger.info("Chat function called")
     try:
         prompt_text = data.get("content") or data.get("prompt_text", "")
-        raw_history = data.get("history", [])
+        if not prompt_text:
+            raise ValueError("No prompt text provided")
+            
+        # Initialize and load model
+        model = Model()
+        model.load()
         
-        # Convert history format
-        history = []
-        for msg in raw_history:
-            if isinstance(msg, str):
-                history.append(HumanMessage(content=msg))
-            else:
-                content = msg.get("content", "")
-                msg_type = msg.get("type", "human")
-                if msg_type == "human":
-                    history.append(HumanMessage(content=content))
-                else:
-                    history.append(AIMessage(content=content))
-        
-        llm = LLM()
-        response = llm.generate(prompt_text, history)
+        # Generate response
+        response = model.generate(prompt_text)
         return str(response)
             
     except Exception as e:
