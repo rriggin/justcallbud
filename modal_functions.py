@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 # Create a persistent storage for model weights
 CACHE_DIR = "/root/model_cache"
-stub = modal.Stub("just-call-bud-prod")
-cache = NetworkFileSystem.persisted("llama-cache")
+app = modal.App("just-call-bud-prod")
+cache = NetworkFileSystem.new(name="llama-cache", size=20)
 
 def create_image():
     return (
@@ -53,7 +53,7 @@ prompt = ChatPromptTemplate.from_messages([
     ("human", "{input}")
 ])
 
-@stub.cls(
+@app.cls(
     image=create_image(),
     gpu="A10G",
     timeout=600,  # 10 minutes timeout
@@ -123,7 +123,7 @@ class LLM:
         logger.info("Response processed and ready to return")
         return response
 
-@stub.function(
+@app.function(
     image=create_image(),
     gpu="A10G",
     timeout=600,
@@ -175,4 +175,4 @@ async def chat(data: dict) -> str:
         raise
 
 if __name__ == "__main__":
-    stub.serve() 
+    app.serve() 
