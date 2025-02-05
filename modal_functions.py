@@ -24,7 +24,10 @@ def create_image():
             "transformers==4.37.2",
             "accelerate>=0.26.1",
             "huggingface-hub>=0.19.4",
-            "safetensors>=0.4.1"
+            "safetensors>=0.4.1",
+            "langchain>=0.1.0",
+            "langchain-core>=0.1.30",
+            "langchain-community>=0.0.27"
         ])
         .run_commands(
             # Install CUDA dependencies
