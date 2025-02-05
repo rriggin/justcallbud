@@ -1,5 +1,5 @@
 import modal
-from modal import App, Image, Secret, web_endpoint, Volume
+from modal import Image, Secret, NetworkFileSystem
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain.memory import ConversationBufferMemory
@@ -14,8 +14,10 @@ from typing import List, Any
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create a volume to store model weights
-volume = Volume.persisted("llama-2-cache")
+# Create a persistent storage for model weights
+CACHE_DIR = "/root/model_cache"
+stub = modal.Stub("just-call-bud-prod")
+cache = NetworkFileSystem.persisted("llama-cache")
 
 def create_image():
     return (
@@ -51,14 +53,12 @@ prompt = ChatPromptTemplate.from_messages([
     ("human", "{input}")
 ])
 
-app = App("just-call-bud-prod")
-
-@app.cls(
+@stub.cls(
     image=create_image(),
     gpu="A10G",
     timeout=600,  # 10 minutes timeout
     secrets=[modal.Secret.from_name("huggingface-secret")],
-    volumes={"/model_cache": volume}  # Mount the volume
+    network_file_systems={CACHE_DIR: cache}
 )
 class LLM:
     def __enter__(self):
@@ -72,12 +72,10 @@ class LLM:
         login(token=self.hf_token)
         logger.info("Successfully logged in to Hugging Face")
         
-        cache_dir = "/model_cache"
-        
         logger.info("Loading tokenizer from cache or downloading...")
         self.tokenizer = AutoTokenizer.from_pretrained(
             "meta-llama/Llama-2-7b-chat-hf",
-            cache_dir=cache_dir
+            cache_dir=CACHE_DIR
         )
         logger.info("Tokenizer loaded successfully")
         
@@ -86,7 +84,7 @@ class LLM:
             "meta-llama/Llama-2-7b-chat-hf",
             device_map="auto",
             torch_dtype=torch.float16,
-            cache_dir=cache_dir
+            cache_dir=CACHE_DIR
         )
         logger.info("Model loaded successfully")
         
@@ -125,12 +123,12 @@ class LLM:
         logger.info("Response processed and ready to return")
         return response
 
-@app.function(
+@stub.function(
     image=create_image(),
     gpu="A10G",
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")],
-    volumes={"/model_cache": volume},  # Mount the volume
+    network_file_systems={CACHE_DIR: cache},
     is_generator=False
 )
 async def chat(data: dict) -> str:
@@ -177,4 +175,4 @@ async def chat(data: dict) -> str:
         raise
 
 if __name__ == "__main__":
-    modal.serve(app) 
+    stub.serve() 
