@@ -329,8 +329,14 @@
                 if (content) {
                     addMessageToUI({ content, isUser: true });
                 }
+                
+                // Store image URL before clearing preview
+                let imageUrl = null;
                 if (currentImage) {
-                    addImageToUI(URL.createObjectURL(currentImage), true);
+                    imageUrl = URL.createObjectURL(currentImage);
+                    // Clear preview immediately to prevent double display
+                    imagePreview.classList.add('hidden');
+                    addImageToUI(imageUrl, true);
                 }
 
                 input.disabled = true;
@@ -371,8 +377,13 @@
                     isUser: false
                 });
             } finally {
+                // Clean up
+                if (currentImage) {
+                    URL.revokeObjectURL(previewImg.src);
+                }
                 currentImage = null;
                 imagePreview.classList.add('hidden');
+                previewImg.src = '';
                 imageUpload.value = ''; // Clear the file input
                 input.disabled = false;
                 form.querySelector('button').disabled = false;
