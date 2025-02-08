@@ -22,13 +22,8 @@ jobs:
         env:
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
-          REDIS_URL: ${{ secrets.REDIS_URL }}
         run: |
           python -m modal token set --token-id $MODAL_TOKEN_ID --token-secret $MODAL_TOKEN_SECRET
-          # Remove existing Redis secret if it exists (ignore errors if it doesn't)
-          python -m modal secret delete redis-secret || true
-          # Create new Redis secret
-          python -m modal secret create redis-secret REDIS_URL="$REDIS_URL"
           python -m modal deploy modal_functions.py
           
       - name: Test deployment

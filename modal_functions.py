@@ -1,10 +1,12 @@
 import modal
-from modal import Image, Secret
+from modal import Image, Secret, Volume
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import torch
 import logging
 import os
+import json
+import hashlib
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 from typing import List, Any
 
@@ -12,12 +14,42 @@ from typing import List, Any
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create app and volume for persistent storage
+# Create app and volumes for persistent storage
 app = modal.App("just-call-bud-prod")
 
-# Create a volume for model weights
+# Create volumes for model weights and response cache
 MODEL_DIR = "/model"
-volume = modal.Volume.from_name("llama-weights", create_if_missing=True)
+CACHE_DIR = "/cache"
+model_volume = modal.Volume.from_name("llama-weights", create_if_missing=True)
+cache_volume = modal.Volume.from_name("response-cache", create_if_missing=True)
+
+def get_cache_key(prompt_text: str, image_path: str = None) -> str:
+    """Generate a unique cache key based on input"""
+    context = f"{prompt_text}:{image_path if image_path else ''}"
+    return f"response_{hashlib.md5(context.encode()).hexdigest()}.json"
+
+def save_to_cache(cache_key: str, response: str):
+    """Save response to cache file"""
+    try:
+        cache_path = os.path.join(CACHE_DIR, cache_key)
+        with open(cache_path, 'w') as f:
+            json.dump({'response': response}, f)
+        logger.info(f"Response cached successfully at {cache_path}")
+    except Exception as e:
+        logger.warning(f"Failed to cache response: {str(e)}")
+
+def load_from_cache(cache_key: str) -> str | None:
+    """Load response from cache file if it exists"""
+    try:
+        cache_path = os.path.join(CACHE_DIR, cache_key)
+        if os.path.exists(cache_path):
+            with open(cache_path, 'r') as f:
+                data = json.load(f)
+                logger.info(f"Cache hit! Loading from {cache_path}")
+                return data['response']
+    except Exception as e:
+        logger.warning(f"Failed to load from cache: {str(e)}")
+    return None
 
 def create_image():
     return (
@@ -138,7 +170,10 @@ class Model:
     gpu="A10G",
     timeout=600,
     secrets=[modal.Secret.from_name("huggingface-secret")],
-    volumes={MODEL_DIR: volume},
+    volumes={
+        MODEL_DIR: model_volume,
+        CACHE_DIR: cache_volume
+    },
     container_idle_timeout=300
 )
 async def chat(data: dict) -> str:
@@ -150,6 +185,14 @@ async def chat(data: dict) -> str:
         
         if not prompt_text:
             raise ValueError("No prompt text provided")
+
+        # Try to get cached response
+        cache_key = get_cache_key(prompt_text, image_path)
+        cached_response = load_from_cache(cache_key)
+        if cached_response:
+            return cached_response
+        
+        logger.info("Cache miss. Generating new response...")
             
         # If there's an image, add context to the prompt
         if image_path:
@@ -161,7 +204,12 @@ async def chat(data: dict) -> str:
         
         # Generate response
         response = model.generate(prompt_text)
-        return str(response)
+        response_text = str(response)
+
+        # Cache the response
+        save_to_cache(cache_key, response_text)
+
+        return response_text
             
     except Exception as e:
         logger.error(f"Error in chat function: {str(e)}")
