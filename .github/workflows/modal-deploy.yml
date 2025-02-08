@@ -25,8 +25,8 @@ jobs:
           REDIS_URL: ${{ secrets.REDIS_URL }}
         run: |
           python -m modal token set --token-id $MODAL_TOKEN_ID --token-secret $MODAL_TOKEN_SECRET
-          # Create Redis secret in Modal
-          python -m modal secret create redis-secret REDIS_URL="$REDIS_URL"
+          # Update Redis secret in Modal (creates if doesn't exist, updates if it does)
+          python -m modal secret set redis-secret REDIS_URL="$REDIS_URL"
           python -m modal deploy modal_functions.py
           
       - name: Test deployment
