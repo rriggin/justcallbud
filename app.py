@@ -101,7 +101,9 @@ prompt = ChatPromptTemplate.from_messages([
     ("human", "{input}")
 ])
 
-# Initialize Redis client (optional)
+# Redis initialization code - commented out as we're using Modal volumes for caching
+# If we need distributed caching across services in the future, we can re-enable this
+"""
 try:
     redis_url = os.getenv('REDIS_URL')  # Render provides this environment variable
     if redis_url and USE_MODAL:  # In production
@@ -125,8 +127,24 @@ except Exception as e:
     redis_client = None
     redis_enabled = False
     logger.warning(f"Redis cache not available - caching disabled: {str(e)}")
+"""
 
+# Redis-related variables - commented out as not currently in use
+"""
 CACHE_EXPIRATION = 3600  # Cache for 1 hour
+
+def get_cache_key(conversation_id, prompt_text, history):
+    if not redis_enabled:
+        return None
+        
+    history_str = json.dumps([{
+        'content': msg.content,
+        'is_user': isinstance(msg, HumanMessage)
+    } for msg in history])
+    
+    context = f"{conversation_id}:{prompt_text}:{history_str}"
+    return f"chat_response:{hashlib.md5(context.encode()).hexdigest()}"
+"""
 
 def get_cache_key(conversation_id, prompt_text, history):
     """Generate a unique cache key based on conversation context"""
