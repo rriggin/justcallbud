@@ -7,8 +7,9 @@ import logging
 import os
 import json
 import hashlib
+import time
+from typing import List, Any, Dict, Optional, Union
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
-from typing import List, Any
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -23,30 +24,63 @@ CACHE_DIR = "/cache"
 model_volume = modal.Volume.from_name("llama-weights", create_if_missing=True)
 cache_volume = modal.Volume.from_name("response-cache", create_if_missing=True)
 
-def get_cache_key(prompt_text: str, image_path: str = None) -> str:
+# Cache configuration
+CACHE_EXPIRATION = 3600 * 24  # Cache for 24 hours
+memory_cache: Dict[str, Dict[str, Any]] = {}
+
+def get_cache_key(prompt_text: str, image_path: Optional[str] = None) -> str:
     """Generate a unique cache key based on input"""
     context = f"{prompt_text}:{image_path if image_path else ''}"
     return f"response_{hashlib.md5(context.encode()).hexdigest()}.json"
 
-def save_to_cache(cache_key: str, response: str):
-    """Save response to cache file"""
+def save_to_cache(cache_key: str, response: str) -> None:
+    """Save response to both memory and disk cache"""
     try:
+        # Save to memory cache
+        memory_cache[cache_key] = {
+            'response': response,
+            'timestamp': time.time()
+        }
+        
+        # Save to disk cache
         cache_path = os.path.join(CACHE_DIR, cache_key)
         with open(cache_path, 'w') as f:
-            json.dump({'response': response}, f)
+            json.dump({
+                'response': response,
+                'timestamp': time.time()
+            }, f)
         logger.info(f"Response cached successfully at {cache_path}")
     except Exception as e:
         logger.warning(f"Failed to cache response: {str(e)}")
 
-def load_from_cache(cache_key: str) -> str | None:
-    """Load response from cache file if it exists"""
+def load_from_cache(cache_key: str) -> Optional[str]:
+    """Load response from cache, checking memory first then disk"""
     try:
+        current_time = time.time()
+        
+        # Check memory cache first
+        if cache_key in memory_cache:
+            cache_data = memory_cache[cache_key]
+            if current_time - cache_data['timestamp'] < CACHE_EXPIRATION:
+                logger.info("Memory cache hit!")
+                return cache_data['response']
+            else:
+                del memory_cache[cache_key]
+        
+        # Check disk cache if not in memory
         cache_path = os.path.join(CACHE_DIR, cache_key)
         if os.path.exists(cache_path):
             with open(cache_path, 'r') as f:
-                data = json.load(f)
-                logger.info(f"Cache hit! Loading from {cache_path}")
-                return data['response']
+                cache_data = json.load(f)
+                if current_time - cache_data['timestamp'] < CACHE_EXPIRATION:
+                    # Update memory cache
+                    memory_cache[cache_key] = cache_data
+                    logger.info(f"Disk cache hit! Loading from {cache_path}")
+                    return cache_data['response']
+                else:
+                    # Remove expired cache file
+                    os.remove(cache_path)
+                    logger.info(f"Removed expired cache file: {cache_path}")
     except Exception as e:
         logger.warning(f"Failed to load from cache: {str(e)}")
     return None
@@ -83,18 +117,28 @@ Your purpose is to provide practical, safety-focused home maintenance advice.
 Keep all responses focused on technical details and solutions."""
 
 class Model:
+    _instance = None
+    _is_initialized = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(Model, cls).__new__(cls)
+        return cls._instance
+
     def __init__(self):
-        self.tokenizer = None
-        self.model = None
-        self.pipe = None
-        self.device = None
-        # Get Hugging Face token from environment
-        self.hf_token = os.environ.get("HUGGINGFACE_TOKEN")
-        if not self.hf_token:
-            logger.warning("HUGGINGFACE_TOKEN not found in environment, trying HF_TOKEN")
-            self.hf_token = os.environ.get("HF_TOKEN")
-        if not self.hf_token:
-            raise ValueError("No Hugging Face token found in environment variables")
+        if not self._is_initialized:
+            self.tokenizer = None
+            self.model = None
+            self.pipe = None
+            self.device = None
+            # Get Hugging Face token from environment
+            self.hf_token = os.environ.get("HUGGINGFACE_TOKEN")
+            if not self.hf_token:
+                logger.warning("HUGGINGFACE_TOKEN not found in environment, trying HF_TOKEN")
+                self.hf_token = os.environ.get("HF_TOKEN")
+            if not self.hf_token:
+                raise ValueError("No Hugging Face token found in environment variables")
+            self._is_initialized = True
 
     def load(self):
         """Load the model and tokenizer"""
@@ -198,9 +242,10 @@ async def chat(data: dict) -> str:
         if image_path:
             prompt_text = f"The user has uploaded an image ({image_path}). Please analyze this image along with their message: {prompt_text}"
             
-        # Initialize and load model
+        # Initialize model only once and reuse it
         model = Model()
-        model.load()
+        if not model.pipe:  # Only load if not already loaded
+            model.load()
         
         # Generate response
         response = model.generate(prompt_text)
