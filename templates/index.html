@@ -102,7 +102,7 @@
                 </div>
 
                 <!-- Input Form Area -->
-                <div class="fixed bottom-0 left-0 right-0 lg:right-80 bg-gradient-to-t from-white via-white to-transparent">
+                <div id="input-form-area" class="fixed bottom-0 left-0 right-0 lg:right-80 bg-gradient-to-t from-white via-white to-transparent">
                     <div class="max-w-3xl mx-auto p-4">
                         <!-- Input Form -->
                         <form id="chat-form" class="relative bg-white rounded-lg shadow-lg border border-gray-200 mt-12">
@@ -330,6 +330,9 @@
                     addImageToUI(imageUrl, true);
                 }
 
+                // Hide the input form area while waiting for response
+                document.getElementById('input-form-area').classList.add('hidden');
+
                 input.disabled = true;
                 form.querySelector('button').disabled = true;
 
@@ -386,6 +389,8 @@
                     if (done) {
                         // Show the contact pro button after streaming is complete
                         contactProButton.classList.remove('hidden');
+                        // Show the input form area again
+                        document.getElementById('input-form-area').classList.remove('hidden');
                         break;
                     }
 
