@@ -244,9 +244,12 @@ def chat():
 
         # Get or create conversation
         conversation_id = get_or_create_conversation()
+        logger.info(f"Using conversation ID: {conversation_id}")
         
         # Get conversation history
         history = get_conversation_history(conversation_id)
+        logger.info(f"Retrieved {len(history)} messages from history")
+        logger.debug(f"History contents: {[{'content': msg.content, 'is_user': isinstance(msg, HumanMessage)} for msg in history]}")
 
         # Handle image upload if present
         image_path = None
@@ -270,6 +273,7 @@ def chat():
                     raise RuntimeError("Modal function not properly initialized")
                     
                 logger.info("Calling Modal function...")
+                logger.debug(f"Sending to Modal - Prompt: {prompt_text}, History length: {len(history)}")
                 
                 def generate_stream():
                     try:
@@ -280,22 +284,26 @@ def chat():
                         })
                         
                         # Save user message to history
-                        supabase.table('messages').insert({
+                        logger.info("Saving user message to Supabase")
+                        user_msg_result = supabase.table('messages').insert({
                             'conversation_id': conversation_id,
                             'content': prompt_text,
                             'is_user': True,
                             'created_at': datetime.now().isoformat(),
                             'message_number': len(history) * 2
                         }).execute()
+                        logger.debug(f"User message save result: {user_msg_result}")
 
                         # Save AI response to history
-                        supabase.table('messages').insert({
+                        logger.info("Saving AI response to Supabase")
+                        ai_msg_result = supabase.table('messages').insert({
                             'conversation_id': conversation_id,
                             'content': response_text,
                             'is_user': False,
                             'created_at': datetime.now().isoformat(),
                             'message_number': len(history) * 2 + 1
                         }).execute()
+                        logger.debug(f"AI message save result: {ai_msg_result}")
                         
                         # Split response into chunks and stream them
                         chunk_size = 50  # Number of characters per chunk
