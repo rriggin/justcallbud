@@ -351,8 +351,8 @@
                 messageDiv.className = 'flex justify-start mb-4';
                 messageDiv.innerHTML = `
                     <div class="max-w-[85%] bg-white text-gray-900 rounded-lg px-4 py-2 shadow-sm border border-gray-100">
-                        <p class="message-content"></p>
-                        <div class="mt-3 flex justify-center">
+                        <p class="message-content whitespace-pre-line"></p>
+                        <div class="contact-pro-button hidden mt-3 flex justify-center">
                             <button class="request-quote px-4 py-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors">
                                 Contact a local pro
                             </button>
@@ -361,6 +361,7 @@
                 `;
                 messagesContainer.appendChild(messageDiv);
                 const messageContent = messageDiv.querySelector('.message-content');
+                const contactProButton = messageDiv.querySelector('.contact-pro-button');
 
                 // Handle streaming response
                 const response = await fetch('/api/chat', {
@@ -382,7 +383,11 @@
 
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
+                    if (done) {
+                        // Show the contact pro button after streaming is complete
+                        contactProButton.classList.remove('hidden');
+                        break;
+                    }
 
                     const chunk = decoder.decode(value);
                     const lines = chunk.split('\n');
@@ -396,7 +401,11 @@
                                 }
                                 if (!data.done) {
                                     accumulatedContent += data.content;
-                                    messageContent.textContent = accumulatedContent;
+                                    // Format the content with proper line breaks
+                                    messageContent.textContent = accumulatedContent
+                                        .replace(/(\d+\.\s)/g, '\n$1')  // Add line break before numbered items
+                                        .replace(/\n\n+/g, '\n\n')      // Remove excessive line breaks
+                                        .trim();                        // Remove extra whitespace
                                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
                                 }
                             } catch (e) {
