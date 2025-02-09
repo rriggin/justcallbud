@@ -176,8 +176,8 @@
 
     <!-- Quote Request Form Template -->
     <template id="quote-form-template">
-        <div class="mb-4">
-            <div class="bg-white rounded-lg px-4 py-3 shadow-sm">
+        <div class="mb-4 flex justify-center w-full">
+            <div class="bg-white rounded-lg px-4 py-3 shadow-sm max-w-md w-full mt-4">
                 <form id="quote-request-form" class="space-y-3">
                     <div>
                         <input type="text" name="name" required placeholder="Name" 
@@ -352,7 +352,7 @@
                 messageDiv.innerHTML = `
                     <div class="max-w-[85%] bg-white text-gray-900 rounded-lg px-4 py-2 shadow-sm border border-gray-100">
                         <p class="message-content whitespace-pre-line"></p>
-                        <div class="contact-pro-button hidden mt-3 flex justify-center">
+                        <div class="contact-pro-button hidden mt-3 mb-4 flex justify-center">
                             <button class="request-quote px-4 py-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors">
                                 Contact a local pro
                             </button>
