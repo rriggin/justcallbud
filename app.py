@@ -199,7 +199,23 @@ def create_new_conversation(user_id):
 def get_or_create_conversation():
     """Get existing or create new conversation"""
     user_id = get_or_create_anonymous_user()
-    # Always create a new conversation
+    
+    # Check for existing conversation in session
+    if 'conversation_id' in session:
+        # Verify the conversation exists and belongs to the user
+        try:
+            result = supabase.table('conversations') \
+                .select('*') \
+                .eq('id', session['conversation_id']) \
+                .eq('user_id', user_id) \
+                .execute()
+            if result.data:
+                logger.info(f"Using existing conversation: {session['conversation_id']}")
+                return session['conversation_id']
+        except Exception as e:
+            logger.error(f"Error checking existing conversation: {str(e)}")
+    
+    # Create new conversation if none exists
     return create_new_conversation(user_id)
 
 def get_conversation_history(conversation_id):
@@ -411,13 +427,12 @@ def get_messages():
 @app.route('/api/messages', methods=['DELETE'])
 def clear_messages():
     try:
-        # Create new conversation
-        user_id = get_or_create_anonymous_user()
-        create_new_conversation(user_id)
-        return jsonify({'status': 'success'})
+        # Clear the current conversation ID from session to force creating a new one
+        session.pop('conversation_id', None)
+        return jsonify({"status": "success"})
     except Exception as e:
         logger.error(f"Error clearing messages: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/health')
 def health():
