@@ -193,15 +193,22 @@ class Model:
         logger.info("Model loaded successfully")
 
     @torch.inference_mode()
-    def generate(self, prompt_text: str) -> str:
+    def generate(self, prompt_text: str, history: List[Dict[str, Any]] = None) -> str:
         """Generate a response for the given prompt"""
         logger.info("Generating response...")
         
-        formatted_prompt = f"{SYSTEM_PROMPT}\n\nUser: {prompt_text}\n\nBud:"
+        # Format conversation history
+        conversation = SYSTEM_PROMPT + "\n\n"
+        if history:
+            for msg in history:
+                prefix = "User: " if msg['is_user'] else "Bud: "
+                conversation += f"{prefix}{msg['content']}\n\n"
+        
+        conversation += f"User: {prompt_text}\n\nBud:"
         
         with torch.cuda.amp.autocast():
             result = self.pipe(
-                formatted_prompt,
+                conversation,
                 return_full_text=False,
                 pad_token_id=self.tokenizer.eos_token_id,
                 eos_token_id=self.tokenizer.eos_token_id,
@@ -225,6 +232,7 @@ async def chat(data: dict) -> str:
     logger.info("Chat function called")
     try:
         prompt_text = data.get("content") or data.get("prompt_text", "")
+        history = data.get("history", [])
         image_path = data.get("image_path")
         
         if not prompt_text:
@@ -247,8 +255,8 @@ async def chat(data: dict) -> str:
         if not model.pipe:  # Only load if not already loaded
             model.load()
         
-        # Generate response
-        response = model.generate(prompt_text)
+        # Generate response with history
+        response = model.generate(prompt_text, history)
         response_text = str(response)
 
         # Cache the response

@@ -242,6 +242,12 @@ def chat():
         if not prompt_text:
             return jsonify({"error": "No content provided"}), 400
 
+        # Get or create conversation
+        conversation_id = get_or_create_conversation()
+        
+        # Get conversation history
+        history = get_conversation_history(conversation_id)
+
         # Handle image upload if present
         image_path = None
         if 'image' in request.files:
@@ -257,9 +263,6 @@ def chat():
                 # Append image info to prompt
                 prompt_text = f"{prompt_text}\n[Image uploaded: {image_path}]"
                 logger.info(f"Image saved at: {filepath}")
-
-        # Convert history format for the model
-        history = []  # We'll implement history later if needed
         
         if USE_MODAL:
             try:
@@ -267,19 +270,65 @@ def chat():
                     raise RuntimeError("Modal function not properly initialized")
                     
                 logger.info("Calling Modal function...")
-                response_text = modal_function.remote({
-                    "prompt_text": prompt_text,
-                    "history": history,
-                    "image_path": image_path
-                })
-                logger.info("Modal function call completed")
                 
-                # Return JSON response
-                return jsonify({
-                    "content": response_text,
-                    "isUser": False,
-                    "image_path": image_path
-                })
+                def generate_stream():
+                    try:
+                        response_text = modal_function.remote({
+                            "prompt_text": prompt_text,
+                            "history": [{"content": msg.content, "is_user": isinstance(msg, HumanMessage)} for msg in history],
+                            "image_path": image_path
+                        })
+                        
+                        # Save user message to history
+                        supabase.table('messages').insert({
+                            'conversation_id': conversation_id,
+                            'content': prompt_text,
+                            'is_user': True,
+                            'created_at': datetime.now().isoformat(),
+                            'message_number': len(history) * 2
+                        }).execute()
+
+                        # Save AI response to history
+                        supabase.table('messages').insert({
+                            'conversation_id': conversation_id,
+                            'content': response_text,
+                            'is_user': False,
+                            'created_at': datetime.now().isoformat(),
+                            'message_number': len(history) * 2 + 1
+                        }).execute()
+                        
+                        # Split response into chunks and stream them
+                        chunk_size = 50  # Number of characters per chunk
+                        chunks = [response_text[i:i + chunk_size] 
+                                for i in range(0, len(response_text), chunk_size)]
+                        
+                        for chunk in chunks:
+                            data = {
+                                "content": chunk,
+                                "isUser": False,
+                                "done": False
+                            }
+                            yield f"data: {json.dumps(data)}\n\n"
+                            time.sleep(0.05)  # Small delay between chunks
+                        
+                        # Send final chunk to indicate completion
+                        yield f"data: {json.dumps({'content': '', 'done': True})}\n\n"
+                        
+                    except Exception as e:
+                        error_data = {
+                            "error": str(e),
+                            "done": True
+                        }
+                        yield f"data: {json.dumps(error_data)}\n\n"
+                
+                return Response(
+                    generate_stream(),
+                    mimetype='text/event-stream',
+                    headers={
+                        'Cache-Control': 'no-cache',
+                        'Connection': 'keep-alive'
+                    }
+                )
                 
             except Exception as e:
                 error_msg = f"Error in Modal operation: {str(e)}"
@@ -287,9 +336,27 @@ def chat():
                 logger.error("Full error details:", exc_info=True)
                 return jsonify({"error": error_msg}), 500
         else:
-            # Local LLM path (unchanged)
+            # Local development path
             llm = ChatOllama(model="llama2")
             response = llm.generate(prompt_text, history)
+            
+            # Save messages to history even in development
+            supabase.table('messages').insert({
+                'conversation_id': conversation_id,
+                'content': prompt_text,
+                'is_user': True,
+                'created_at': datetime.now().isoformat(),
+                'message_number': len(history) * 2
+            }).execute()
+            
+            supabase.table('messages').insert({
+                'conversation_id': conversation_id,
+                'content': response,
+                'is_user': False,
+                'created_at': datetime.now().isoformat(),
+                'message_number': len(history) * 2 + 1
+            }).execute()
+            
             return jsonify({
                 "content": response,
                 "isUser": False,
