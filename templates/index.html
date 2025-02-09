@@ -52,6 +52,14 @@
             height: 14px;
             stroke: #6b7280;
         }
+        .input-form-hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(20px);
+        }
+        #input-form-area {
+            transition: all 0.3s ease-in-out;
+        }
     </style>
 </head>
 <body class="min-h-screen bg-gray-50">
@@ -331,7 +339,8 @@
                 }
 
                 // Hide the input form area while waiting for response
-                document.getElementById('input-form-area').classList.add('hidden');
+                const inputFormArea = document.getElementById('input-form-area');
+                inputFormArea.classList.add('input-form-hidden');
 
                 input.disabled = true;
                 form.querySelector('button').disabled = true;
@@ -351,7 +360,7 @@
 
                 // Create a message container for streaming response
                 const messageDiv = document.createElement('div');
-                messageDiv.className = 'flex justify-start mb-4';
+                messageDiv.className = 'flex justify-start mb-4 hidden'; // Add hidden class initially
                 messageDiv.innerHTML = `
                     <div class="max-w-[85%] bg-white text-gray-900 rounded-lg px-4 py-2 shadow-sm border border-gray-100">
                         <p class="message-content whitespace-pre-line"></p>
@@ -383,6 +392,7 @@
 
                 let accumulatedContent = '';
                 const decoder = new TextDecoder();
+                let isFirstChunk = true;
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -390,7 +400,8 @@
                         // Show the contact pro button after streaming is complete
                         contactProButton.classList.remove('hidden');
                         // Show the input form area again
-                        document.getElementById('input-form-area').classList.remove('hidden');
+                        const inputFormArea = document.getElementById('input-form-area');
+                        inputFormArea.classList.remove('input-form-hidden');
                         break;
                     }
 
@@ -405,6 +416,10 @@
                                     throw new Error(data.error);
                                 }
                                 if (!data.done) {
+                                    if (isFirstChunk && data.content.trim()) {
+                                        messageDiv.classList.remove('hidden'); // Show message div on first content
+                                        isFirstChunk = false;
+                                    }
                                     accumulatedContent += data.content;
                                     // Format the content with proper line breaks
                                     messageContent.textContent = accumulatedContent
