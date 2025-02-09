@@ -355,18 +355,65 @@
                     }
                 }
 
+                // Create a message container for streaming response
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'flex justify-start mb-4';
+                messageDiv.innerHTML = `
+                    <div class="max-w-[85%] bg-white text-gray-900 rounded-lg px-4 py-2 shadow-sm border border-gray-100">
+                        <p class="message-content"></p>
+                        <div class="mt-3 flex justify-center">
+                            <button class="request-quote px-4 py-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 transition-colors">
+                                Contact a local pro
+                            </button>
+                        </div>
+                    </div>
+                `;
+                messagesContainer.appendChild(messageDiv);
+                const messageContent = messageDiv.querySelector('.message-content');
+
+                // Handle streaming response
                 const response = await fetch('/api/chat', {
                     method: 'POST',
                     body: formData
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Network response was not ok');
+                    throw new Error('Network response was not ok');
                 }
 
-                const data = await response.json();
-                addMessageToUI(data);
+                const reader = response.body?.getReader();
+                if (!reader) {
+                    throw new Error('Response body is not readable');
+                }
+
+                let accumulatedContent = '';
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                if (data.error) {
+                                    throw new Error(data.error);
+                                }
+                                if (!data.done) {
+                                    accumulatedContent += data.content;
+                                    messageContent.textContent = accumulatedContent;
+                                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                                }
+                            } catch (e) {
+                                console.error('Error parsing SSE data:', e);
+                            }
+                        }
+                    }
+                }
 
             } catch (error) {
                 console.error('Full error details:', error);
@@ -515,14 +562,44 @@
         // Call it
         testEndpoint();
 
+        // Add click handler for the scroll indicator
+        scrollIndicator.addEventListener('click', () => {
+            messagesContainer.scrollTo({
+                top: messagesContainer.scrollHeight,
+                behavior: 'smooth'
+            });
+        });
+
+        // Add event delegation for quote request buttons
+        messagesContainer.addEventListener('click', function(e) {
+            if (e.target.classList.contains('request-quote')) {
+                // Get the quote form template
+                const template = document.getElementById('quote-form-template');
+                const formContent = template.content.cloneNode(true);
+                
+                // Create a container for the form
+                const formContainer = document.createElement('div');
+                formContainer.className = 'flex justify-start mb-4';
+                formContainer.appendChild(formContent);
+                
+                // Insert the form after the clicked button's message
+                const messageDiv = e.target.closest('.flex');
+                messageDiv.insertAdjacentElement('afterend', formContainer);
+                
+                // Add submit handler to the form
+                const quoteForm = formContainer.querySelector('#quote-request-form');
+                quoteForm.addEventListener('submit', handleQuoteRequest);
+                
+                // Disable the clicked button to prevent multiple forms
+                e.target.disabled = true;
+            }
+        });
+
+        // Add quote request handler
         async function handleQuoteRequest(e) {
             e.preventDefault();
             const form = e.target;
             const formData = new FormData(form);
-            // Log form data
-            for (let [key, value] of formData.entries()) {
-                console.log(`${key}: ${value}`);
-            }
             const errorDiv = form.querySelector('#form-error');
             
             try {
@@ -543,9 +620,11 @@
                 
                 // Show success message
                 form.parentNode.innerHTML = `
-                    <div class="text-green-600">
-                        <p class="font-medium">Thank you! Your quote request has been submitted.</p>
-                        <p class="text-sm mt-2">A professional will contact you shortly.</p>
+                    <div class="max-w-[85%] bg-white rounded-lg px-6 py-4 border border-gray-200 shadow-sm">
+                        <div class="text-green-600">
+                            <p class="font-medium">Thank you! Your quote request has been submitted.</p>
+                            <p class="text-sm mt-2">A professional will contact you shortly.</p>
+                        </div>
                     </div>
                 `;
             } catch (error) {
@@ -554,14 +633,6 @@
                 errorDiv.classList.remove('hidden');
             }
         }
-
-        // Add click handler for the scroll indicator
-        scrollIndicator.addEventListener('click', () => {
-            messagesContainer.scrollTo({
-                top: messagesContainer.scrollHeight,
-                behavior: 'smooth'
-            });
-        });
     </script>
 </body>
 </html>
